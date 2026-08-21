@@ -522,7 +522,8 @@ export class WatchFormView extends LitElement {
     }
   }
 
-  private async remove(): Promise<void> {
+  // HTMLElement.remove()와 이름이 겹치지 않도록 removeWatch
+  private async removeWatch(): Promise<void> {
     if (this.editId === null) return;
     await api(`/api/watches/${this.editId}`, { method: 'DELETE' });
     toast('삭제했어요. 종료된 알림에서 복구할 수 있어요');
@@ -930,7 +931,7 @@ export class WatchFormView extends LitElement {
         </button>
         ${this.editId !== null
           ? html`
-              <button class="btn-ghost danger-btn" @click=${(): void => void this.remove()}>
+              <button class="btn-ghost danger-btn" @click=${(): void => void this.removeWatch()}>
                 알림 삭제
               </button>
             `
