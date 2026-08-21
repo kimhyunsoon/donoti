@@ -4,8 +4,10 @@ import { keyed } from 'lit/directives/keyed.js';
 import { tokens } from './style.js';
 import './views/login-view.js';
 import './views/home-view.js';
+import './views/settings-view.js';
+import './views/notifications-view.js';
 
-// 해시 라우터: #/login, 그 외 전부 → 홈
+// 해시 라우터: #/login #/settings #/notifications, 그 외 전부 → 홈
 @customElement('app-root')
 export class AppRoot extends LitElement {
   static styles = [
@@ -44,6 +46,8 @@ export class AppRoot extends LitElement {
 
   private renderView(path: string): TemplateResult {
     if (path.startsWith('#/login')) return html`<login-view></login-view>`;
+    if (path.startsWith('#/settings')) return html`<settings-view></settings-view>`;
+    if (path.startsWith('#/notifications')) return html`<notifications-view></notifications-view>`;
     return html`<home-view></home-view>`;
   }
 

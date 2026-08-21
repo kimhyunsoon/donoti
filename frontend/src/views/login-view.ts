@@ -50,7 +50,7 @@ export class LoginView extends LitElement {
   render(): TemplateResult {
     return html`
       <form @submit=${this.onSubmit}>
-        <div class="logo"><img src="/logo-text.png" alt="donoti"></div>
+        <div class="logo"><img src="/logo-text.png" alt="두노티"></div>
         <input name="username" placeholder="아이디" autocomplete="username" required>
         <input name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required>
         <button type="submit" class="btn-primary" ?disabled=${this.busy}>로그인</button>

@@ -23,4 +23,10 @@ export async function pushRoutes(app: FastifyInstance): Promise<void> {
     ).run(endpoint, keys.p256dh, keys.auth);
     return reply.code(201).send({ ok: true });
   });
+
+  // 이 기기의 알림 끄기 (프론트가 구독 해지 후 호출)
+  app.delete<{ Body: { endpoint: string } }>('/subscriptions', async (req) => {
+    db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(req.body.endpoint);
+    return { ok: true };
+  });
 }

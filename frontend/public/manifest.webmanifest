@@ -1,11 +1,11 @@
 {
-  "name": "donoti",
-  "short_name": "donoti",
+  "name": "두노티",
+  "short_name": "두노티",
   "description": "웹 변경 감지·알림",
   "lang": "ko",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fbf7f5",
+  "background_color": "#f3f4f6",
   "theme_color": "#e64c45",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

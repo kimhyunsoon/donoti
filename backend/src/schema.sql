@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   next_attempt_at INTEGER NOT NULL DEFAULT 0,  -- epoch ms (Date.now() 비교 - datetime 텍스트와 섞지 말 것)
   last_error      TEXT,
   delivered       INTEGER,                -- 성공 시 실제 전달된 구독 수
+  read_at         TEXT,                   -- 알림센터에서 읽은 시각 (NULL = 안읽음, 앱 배지 카운트 기준)
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   sent_at         TEXT
 );

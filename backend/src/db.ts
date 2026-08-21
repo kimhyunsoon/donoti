@@ -12,4 +12,9 @@ db.pragma('foreign_keys = ON');
 export function migrate(): void {
   const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf-8');
   db.exec(schema);
+  // 기존 DB에 없는 컬럼 추가
+  const notiCols = db.prepare('PRAGMA table_info(notifications)').all() as { name: string }[];
+  if (!notiCols.some((c) => c.name === 'read_at')) {
+    db.exec('ALTER TABLE notifications ADD COLUMN read_at TEXT');
+  }
 }

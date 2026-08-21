@@ -38,6 +38,22 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({ id });
   });
 
+  // 안읽은 알림 수 (알림센터 배지용)
+  app.get('/unread-count', async (): Promise<{ count: number }> => {
+    const row = db
+      .prepare(`SELECT COUNT(*) AS c FROM notifications WHERE status = 'sent' AND read_at IS NULL`)
+      .get() as { c: number };
+    return { count: row.c };
+  });
+
+  // 알림센터 진입 시 전체 읽음 처리 (앱 배지도 이 시점에 초기화됨)
+  app.post('/read-all', async () => {
+    db.prepare(
+      `UPDATE notifications SET read_at = datetime('now') WHERE status = 'sent' AND read_at IS NULL`,
+    ).run();
+    return { ok: true };
+  });
+
   // 최종 실패한 알림을 재시도 큐로 되돌린다
   app.post<{ Params: { id: string } }>('/:id/retry', async (req, reply) => {
     const result = db

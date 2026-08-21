@@ -54,7 +54,16 @@ async function broadcast(row: NotificationRow, log: (msg: string) => void): Prom
   const subs = db.prepare('SELECT * FROM push_subscriptions').all() as SubRow[];
   if (subs.length === 0) return 0;
 
-  const payload = JSON.stringify({ title: row.title, body: row.body, url: row.url ?? '/' });
+  // unread = 앱 아이콘 배지 카운트 (이번 알림 포함) - 서비스워커가 setAppBadge에 사용
+  const prev = db
+    .prepare(`SELECT COUNT(*) AS c FROM notifications WHERE status = 'sent' AND read_at IS NULL`)
+    .get() as { c: number };
+  const payload = JSON.stringify({
+    title: row.title,
+    body: row.body,
+    url: row.url ?? '/',
+    unread: prev.c + 1,
+  });
   let delivered = 0;
   let lastError = '';
   for (const sub of subs) {
