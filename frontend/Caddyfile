@@ -1,0 +1,7 @@
+# 컨테이너 내부 정적 서빙 (TLS·프록시는 edge 리포의 공용 Caddy 담당)
+:80 {
+	root * /srv
+	encode gzip
+	try_files {path} /index.html
+	file_server
+}

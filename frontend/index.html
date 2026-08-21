@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <!-- 앱형 UX: 더블탭·핀치 줌 비활성 (버튼 연타 시 확대 방지) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#fbf7f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1d1717" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- 노치·다이나믹 아일랜드 영역까지 앱 배경이 채워지도록 투명 상태바 사용 -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="donoti">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" href="/favicon.png" sizes="48x48">
+  <title>donoti</title>
+  <style>
+    /* 테마 토큰 — data-theme(자동/라이트/다크)이 미디어쿼리보다 우선 */
+    :root {
+      color-scheme: light dark;
+      --bg: #fbf7f5;
+      --surface: #ffffff;
+      --text: #2a2020;
+      --text-sub: #705f5c;
+      --accent: #e64c45;
+      --accent-soft: #fdeae8;
+      --border: #ecdedb;
+      --danger: #c0392b;
+      --warn: #d68910;
+      --ok: #3d7a4a;
+    }
+    :root[data-theme='light'] { color-scheme: light; }
+    :root[data-theme='dark'] {
+      color-scheme: dark;
+      --bg: #1d1717;
+      --surface: #272020;
+      --text: #ede4e3;
+      --text-sub: #ab9a98;
+      --accent: #f0736d;
+      --accent-soft: #3a2321;
+      --border: #403231;
+      --danger: #e07060;
+      --warn: #e0a060;
+      --ok: #6fbf7f;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme='light']) {
+        color-scheme: dark;
+        --bg: #1d1717;
+        --surface: #272020;
+        --text: #ede4e3;
+        --text-sub: #ab9a98;
+        --accent: #f0736d;
+        --accent-soft: #3a2321;
+        --border: #403231;
+        --danger: #e07060;
+        --warn: #e0a060;
+        --ok: #6fbf7f;
+      }
+    }
+    html { font-size: 15px; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+      /* 브라우저 자체 당겨서-새로고침과 앱 내 새로고침의 중복 방지 */
+      overscroll-behavior-y: contain;
+    }
+  </style>
+</head>
+<body>
+  <app-root></app-root>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 node_modules/
+dist/
 .env
-.state/
-queue/
+backend/data/
+*.log

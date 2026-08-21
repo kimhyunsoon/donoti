@@ -1,0 +1,33 @@
+name: donoti
+
+# 리버스 프록시(80/443·TLS)는 공용 게이트웨이 caddy 담당 (dogroo 리포의 gateway/ 참고)
+# 네트워크 `gateway`는 서버에서 수동 생성: docker network create gateway
+# container_name은 gateway/Caddyfile이 참조하므로 변경 금지
+services:
+  backend:
+    build: ../backend
+    container_name: donoti-backend
+    restart: unless-stopped
+    env_file:
+      - /etc/donoti/backend.env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - /root/workspace/donoti-data:/data         # SQLite + 시크릿 (백업 = 이 디렉토리 복사)
+    expose:
+      - "4646"
+    networks:
+      - gateway
+
+  frontend:
+    build: ../frontend
+    container_name: donoti-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - gateway
+
+networks:
+  gateway:
+    external: true

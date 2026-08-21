@@ -1,0 +1,48 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # 서버 웹훅을 부르기 전에 빌드를 검증한다 - 실패하면 배포 자체가 시작되지 않음
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: backend 빌드 검증
+        working-directory: backend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: frontend 빌드 검증
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+  # 항상 전체 재적용 - 변경 없는 이미지는 Docker 캐시로 수 초에 끝나고,
+  # 직전 배포가 실패했더라도 누락 없이 따라잡는다
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 서버 웹훅 호출
+        run: |
+          curl -fsS -X POST "$DEPLOY_URL" \
+            -H "X-Deploy-Key: $DEPLOY_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"targets\":\"deploy\",\"sha\":\"${{ github.sha }}\"}"
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
