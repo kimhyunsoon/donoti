@@ -133,8 +133,29 @@ export const ui = css`
     width: 22px; height: 22px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); transition: 0.15s;
   }
-  .switch input:checked + .knob { background: var(--accent); }
+  .switch input:checked + .knob { background: var(--switch-on); }
   .switch input:checked + .knob::after { transform: translateX(20px); }
+  /* 설정 폼 행 (iOS 스타일: 좌측 라벨 + 우측 컨트롤) */
+  .frow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 40px;
+  }
+  .frow .lbl {
+    color: var(--text-sub);
+    font-size: 0.86rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .frow .ctl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.92rem;
+  }
   /* 상단 바 (뒤로가기 + 제목) */
   .top {
     display: flex;
@@ -158,4 +179,59 @@ export const ui = css`
     from { background-position: 200% 0; }
     to { background-position: -200% 0; }
   }
+`;
+
+// 바텀시트 공통 스타일 (sheets/sheet-base.ts 기반 컴포넌트용)
+export const sheet = css`
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    animation: fade-in 0.18s;
+    transition: opacity 0.18s;
+  }
+  .overlay.closing { opacity: 0; }
+  .panel {
+    background: var(--bg);
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    max-height: 88dvh;
+    border-radius: 18px 18px 0 0;
+    display: flex;
+    flex-direction: column;
+    animation: slide-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+    transition: transform 0.18s ease-out;
+  }
+  .overlay.closing .panel { transform: translateY(105%); transition: transform 0.18s ease-in; }
+  .drag-zone {
+    touch-action: none;
+    flex-shrink: 0;
+    cursor: grab;
+  }
+  .grabber {
+    width: 38px;
+    height: 5px;
+    border-radius: 999px;
+    /* --border는 라이트에서 너무 옅어 안 보인다 - 반투명 text-sub로 살짝 진하게 */
+    background: color-mix(in srgb, var(--text-sub) 45%, transparent);
+    margin: 8px auto 2px;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+  }
+  .panel-head h2 { font-size: 1.05rem; margin: 0; }
+  .panel-body {
+    overflow-y: auto;
+    padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+  @keyframes slide-up { from { transform: translateY(45%); opacity: 0.6; } }
+  @keyframes fade-in { from { opacity: 0; } }
 `;

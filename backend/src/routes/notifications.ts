@@ -17,8 +17,9 @@ interface EnqueueBody {
 export async function notificationRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
 
+  // 알림센터는 항상 최근 100개까지만 보여준다
   app.get<{ Querystring: ListQuery }>('/', async (req) => {
-    const limit = Math.min(req.query.limit ?? 50, 200);
+    const limit = Math.min(req.query.limit ?? 100, 100);
     if (req.query.status) {
       return db
         .prepare('SELECT * FROM notifications WHERE status = ? ORDER BY id DESC LIMIT ?')
@@ -46,12 +47,23 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
     return { count: row.c };
   });
 
-  // 알림센터 진입 시 전체 읽음 처리 (앱 배지도 이 시점에 초기화됨)
+  // 전부 읽음 처리 (알림센터 '모두 읽음' 버튼)
   app.post('/read-all', async () => {
     db.prepare(
       `UPDATE notifications SET read_at = datetime('now') WHERE status = 'sent' AND read_at IS NULL`,
     ).run();
     return { ok: true };
+  });
+
+  // 개별 읽음 처리 (알림센터 스와이프·링크 이동·OS 알림 클릭) - 남은 안읽음 수를 함께 반환해 앱 배지 갱신에 쓴다
+  app.post<{ Params: { id: string } }>('/:id/read', async (req) => {
+    db.prepare(`UPDATE notifications SET read_at = datetime('now') WHERE id = ? AND read_at IS NULL`).run(
+      Number(req.params.id),
+    );
+    const row = db
+      .prepare(`SELECT COUNT(*) AS c FROM notifications WHERE status = 'sent' AND read_at IS NULL`)
+      .get() as { c: number };
+    return { ok: true, unread: row.c };
   });
 
   // 최종 실패한 알림을 재시도 큐로 되돌린다

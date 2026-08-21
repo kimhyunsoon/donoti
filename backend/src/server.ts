@@ -6,10 +6,17 @@ import { db, migrate } from './db.js';
 import { SqliteSessionStore } from './session-store.js';
 import { hashPassword } from './auth.js';
 import { startNotifier } from './notify.js';
+import { startScheduler } from './scheduler.js';
 import { authRoutes } from './routes/auth.js';
 import { pushRoutes } from './routes/push.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { settingsRoutes } from './routes/settings.js';
+import { watchRoutes } from './routes/watches.js';
+import { stockRoutes } from './routes/stocks.js';
+import { emartRoutes } from './routes/emart.js';
+import { cgvRoutes } from './routes/cgv.js';
+import { lotteRoutes } from './routes/lotte.js';
+import { megaboxRoutes } from './routes/megabox.js';
 
 // users 테이블이 비어있으면 env의 초기 계정 생성
 async function bootstrapInitialUser(): Promise<void> {
@@ -46,6 +53,12 @@ async function buildServer(): Promise<FastifyInstance> {
   await app.register(pushRoutes, { prefix: '/api/push' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
   await app.register(settingsRoutes, { prefix: '/api/settings' });
+  await app.register(watchRoutes, { prefix: '/api/watches' });
+  await app.register(stockRoutes, { prefix: '/api/stocks' });
+  await app.register(emartRoutes, { prefix: '/api/emart' });
+  await app.register(cgvRoutes, { prefix: '/api/cgv' });
+  await app.register(lotteRoutes, { prefix: '/api/lotte' });
+  await app.register(megaboxRoutes, { prefix: '/api/megabox' });
 
   return app;
 }
@@ -55,6 +68,7 @@ async function main(): Promise<void> {
   await bootstrapInitialUser();
   const app = await buildServer();
   startNotifier((msg) => app.log.info(msg));
+  startScheduler((msg) => app.log.info(msg));
   await app.listen({ port: config.port, host: config.host });
 }
 

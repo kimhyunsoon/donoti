@@ -6,8 +6,10 @@ import './views/login-view.js';
 import './views/home-view.js';
 import './views/settings-view.js';
 import './views/notifications-view.js';
+import './views/watch-form-view.js';
+import './views/trash-view.js';
 
-// 해시 라우터: #/login #/settings #/notifications, 그 외 전부 → 홈
+// 해시 라우터: #/login #/settings #/notifications #/watch/* #/trash, 그 외 전부 → 홈
 @customElement('app-root')
 export class AppRoot extends LitElement {
   static styles = [
@@ -48,6 +50,8 @@ export class AppRoot extends LitElement {
     if (path.startsWith('#/login')) return html`<login-view></login-view>`;
     if (path.startsWith('#/settings')) return html`<settings-view></settings-view>`;
     if (path.startsWith('#/notifications')) return html`<notifications-view></notifications-view>`;
+    if (path.startsWith('#/watch/')) return html`<watch-form-view></watch-form-view>`;
+    if (path.startsWith('#/trash')) return html`<trash-view></trash-view>`;
     return html`<home-view></home-view>`;
   }
 

@@ -16,6 +16,8 @@ export interface NotificationInput {
   body?: string;
   // 알림 클릭 시 이동 경로
   url?: string;
+  // 이 알림을 만든 watch (홈 목록 '최근 알림' 표기용)
+  watchId?: number;
 }
 
 interface NotificationRow {
@@ -41,10 +43,10 @@ interface SubRow {
 export function enqueueNotification(input: NotificationInput): number {
   const result = db
     .prepare(
-      `INSERT INTO notifications (source, title, body, url, next_attempt_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO notifications (source, title, body, url, watch_id, next_attempt_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(input.source, input.title, input.body ?? '', input.url ?? null, Date.now());
+    .run(input.source, input.title, input.body ?? '', input.url ?? null, input.watchId ?? null, Date.now());
   return Number(result.lastInsertRowid);
 }
 
@@ -59,6 +61,8 @@ async function broadcast(row: NotificationRow, log: (msg: string) => void): Prom
     .prepare(`SELECT COUNT(*) AS c FROM notifications WHERE status = 'sent' AND read_at IS NULL`)
     .get() as { c: number };
   const payload = JSON.stringify({
+    // id: OS 알림 클릭 시 서비스워커가 해당 알림을 읽음 처리하는 데 사용
+    id: row.id,
     title: row.title,
     body: row.body,
     url: row.url ?? '/',

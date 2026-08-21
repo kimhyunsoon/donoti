@@ -9,6 +9,15 @@ const PATHS: Record<string, TemplateResult> = {
   'log-out': svg`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>`,
   'bell-off': svg`<path d="M8.7 3A6 6 0 0 1 18 8c0 4.499 1.411 5.956 2.738 7.326A1 1 0 0 1 20 17h-3"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="m2 2 20 20"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326A1 1 0 0 0 4 17h9"/>`,
   refresh: svg`<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>`,
+  plus: svg`<path d="M5 12h14"/><path d="M12 5v14"/>`,
+  x: svg`<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
+  trash: svg`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`,
+  // 복구 (반시계 회전 화살표)
+  restore: svg`<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>`,
+  dollar: svg`<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  'trending-up': svg`<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>`,
+  check: svg`<path d="M20 6 9 17l-5-5"/>`,
+  'arrow-right': svg`<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>`,
 };
 
 /** 아이콘 렌더링. size 기본 20px, 스트로크는 currentColor */

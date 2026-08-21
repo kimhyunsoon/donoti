@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config } from './config.js';
+import { seedStockSymbols } from './crawlers/stock-symbols.js';
 
 export const db: Database.Database = new Database(join(config.dataDir, 'donoti.db'));
 
@@ -17,4 +18,15 @@ export function migrate(): void {
   if (!notiCols.some((c) => c.name === 'read_at')) {
     db.exec('ALTER TABLE notifications ADD COLUMN read_at TEXT');
   }
+  if (!notiCols.some((c) => c.name === 'watch_id')) {
+    db.exec('ALTER TABLE notifications ADD COLUMN watch_id INTEGER');
+  }
+  const watchCols = db.prepare('PRAGMA table_info(watches)').all() as { name: string }[];
+  if (!watchCols.some((c) => c.name === 'enabled')) {
+    db.exec('ALTER TABLE watches ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!watchCols.some((c) => c.name === 'state')) {
+    db.exec('ALTER TABLE watches ADD COLUMN state TEXT');
+  }
+  seedStockSymbols(db);
 }

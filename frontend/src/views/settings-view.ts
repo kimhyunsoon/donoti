@@ -98,6 +98,13 @@ export class SettingsView extends LitElement {
       </div>
 
       <div class="block card">
+        <div class="row" style="cursor:pointer" @click=${(): void => { location.hash = '#/trash'; }}>
+          <span>종료된 알림</span>
+          <span style="color:var(--text-sub);display:flex">${icon('chevron-right', 18)}</span>
+        </div>
+      </div>
+
+      <div class="block card">
         <div class="row">
           <span>${this.username}</span>
           <button class="btn-ghost" style="display:flex;align-items:center;gap:5px" @click=${(): void => void this.logout()}>

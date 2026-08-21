@@ -31,6 +31,8 @@
       --danger: #e5484d;
       --warn: #d68910;
       --ok: #1fa76b;
+      --switch-on: #34c759; /* iOS 스타일 토글 녹색 */
+      --day-on: #3182f6;    /* 요일 선택 (토스 블루) */
     }
     :root[data-theme='light'] { color-scheme: light; }
     :root[data-theme='dark'] {
@@ -46,6 +48,8 @@
       --danger: #ff6b6b;
       --warn: #e0a060;
       --ok: #3fce8b;
+      --switch-on: #30d158;
+      --day-on: #4593fc;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme='light']) {
@@ -61,6 +65,8 @@
         --danger: #ff6b6b;
         --warn: #e0a060;
         --ok: #3fce8b;
+        --switch-on: #30d158;
+        --day-on: #4593fc;
       }
     }
     html { font-size: 15px; }

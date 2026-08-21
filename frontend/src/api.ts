@@ -14,6 +14,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     location.hash = '#/login';
     return new Promise<never>(() => {});
   }
-  if (!res.ok) throw new Error(`api_error_${res.status}`);
+  if (!res.ok) {
+    // 서버가 준 한국어 메시지({message})가 있으면 그대로 전달해 toast에 쓴다
+    const body = (await res.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message ?? `api_error_${res.status}`);
+  }
   return res.json() as Promise<T>;
 }

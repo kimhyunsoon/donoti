@@ -4,6 +4,10 @@ import { tokens, ui } from '../style.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { toast } from '../ui.js';
+import { relativeTime } from '../format.js';
+import { findProviderById, providerAvatar } from '../catalog.js';
+import '../sheets/confirm-sheet.js';
+import type { ConfirmSheet } from '../sheets/confirm-sheet.js';
 
 interface NotificationRow {
   id: number;
@@ -17,22 +21,8 @@ interface NotificationRow {
   created_at: string; // UTC 'YYYY-MM-DD HH:MM:SS'
 }
 
-// SQLite UTC datetime → 상대 시간 문자열
-function relativeTime(utc: string): string {
-  const diff = Date.now() - new Date(`${utc.replace(' ', 'T')}Z`).getTime();
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return '방금 전';
-  if (min < 60) return `${min}분 전`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}시간 전`;
-  const day = Math.floor(hour / 24);
-  if (day < 7) return `${day}일 전`;
-  return new Date(`${utc.replace(' ', 'T')}Z`).toLocaleDateString('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
+// 알림센터 - 방문만으로는 읽음 처리하지 않는다.
+// 읽음 처리 경로: 우측 스와이프 / 링크 이동 확인 / OS 알림 클릭(서비스워커)
 @customElement('notifications-view')
 export class NotificationsView extends LitElement {
   static styles = [
@@ -46,10 +36,21 @@ export class NotificationsView extends LitElement {
         border-radius: 16px;
         padding: 14px 16px;
         display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        position: relative;
+        /* 수평 스와이프는 읽음 제스처로 처리 (수직 스크롤은 브라우저에 맡김) */
+        touch-action: pan-y;
+      }
+      .item .content {
+        display: flex;
         flex-direction: column;
         gap: 3px;
-        position: relative;
+        min-width: 0;
+        flex: 1;
       }
+      .item.read { opacity: 0.55; }
+      .item.linked { cursor: pointer; }
       .item.unread::before {
         content: '';
         position: absolute;
@@ -79,36 +80,119 @@ export class NotificationsView extends LitElement {
   ];
 
   @state() private items: NotificationRow[] | null = null;
-  // 진입 시점의 안읽음 id - read-all 이후에도 이번 방문 동안은 표시 유지
-  @state() private unreadIds = new Set<number>();
+
+  // 우측 스와이프(읽음 처리) 추적
+  private swipeStartX = -1;
+  private swipeStartY = -1;
+  private swipeEl: HTMLElement | null = null;
+  private swipeMoved = false;
+
+  // 새 푸시 도착 시(서비스워커 postMessage) 목록 즉시 갱신
+  private onSwMessage = (e: MessageEvent): void => {
+    if ((e.data as { type?: string })?.type === 'push') void this.load();
+  };
 
   connectedCallback(): void {
     super.connectedCallback();
     void this.load();
+    navigator.serviceWorker?.addEventListener('message', this.onSwMessage);
+  }
+
+  disconnectedCallback(): void {
+    navigator.serviceWorker?.removeEventListener('message', this.onSwMessage);
+    super.disconnectedCallback();
   }
 
   private async load(): Promise<void> {
-    const items = await api<NotificationRow[]>('/api/notifications?limit=50');
-    this.unreadIds = new Set(
-      items.filter((n) => n.status === 'sent' && n.read_at === null).map((n) => n.id),
-    );
-    this.items = items;
-    // 진입 = 전체 읽음 처리 + 앱 아이콘 배지 제거
-    await api('/api/notifications/read-all', { method: 'POST' });
-    const nav = navigator as Navigator & { clearAppBadge?: () => Promise<void> };
-    if (nav.clearAppBadge) void nav.clearAppBadge().catch(() => {});
+    // 알림센터는 항상 최근 100개까지만. 안읽은 알림을 위로 (그 안에서는 최신순 유지)
+    const items = await api<NotificationRow[]>('/api/notifications?limit=100');
+    const isUnread = (n: NotificationRow): number => (n.status === 'sent' && n.read_at === null ? 0 : 1);
+    this.items = items.sort((a, b) => isUnread(a) - isUnread(b) || b.id - a.id);
   }
 
-  private async retry(id: number): Promise<void> {
-    await api(`/api/notifications/${id}/retry`, { method: 'POST' });
+  // 개별 읽음 처리 + 앱 아이콘 배지 갱신
+  private async markRead(n: NotificationRow): Promise<void> {
+    if (n.read_at) return;
+    const { unread } = await api<{ unread: number }>(`/api/notifications/${n.id}/read`, {
+      method: 'POST',
+    });
+    n.read_at = new Date().toISOString();
+    this.requestUpdate();
+    const nav = navigator as Navigator & {
+      setAppBadge?: (count: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (unread > 0) void nav.setAppBadge?.(unread).catch(() => {});
+    else void nav.clearAppBadge?.().catch(() => {});
+  }
+
+  // 링크 있는 알림 클릭 → 이동 확인 모달 → 읽음 처리 후 링크로
+  private async openLink(n: NotificationRow): Promise<void> {
+    if (this.swipeMoved) {
+      this.swipeMoved = false;
+      return;
+    }
+    if (!n.url) return;
+    const sheet = this.renderRoot.querySelector('confirm-sheet') as ConfirmSheet;
+    const ok = await sheet.show({ title: '링크로 이동할까요?', message: n.url, confirmLabel: '이동' });
+    if (!ok) return;
+    void this.markRead(n);
+    window.open(n.url, '_blank', 'noopener');
+  }
+
+  private onSwipeStart(e: PointerEvent, n: NotificationRow): void {
+    this.swipeMoved = false;
+    // 이미 읽은 알림은 스와이프 제스처 없음
+    if (n.read_at) return;
+    this.swipeStartX = e.clientX;
+    this.swipeStartY = e.clientY;
+    this.swipeEl = e.currentTarget as HTMLElement;
+  }
+
+  private onSwipeMove(e: PointerEvent): void {
+    if (!this.swipeEl) return;
+    const dx = e.clientX - this.swipeStartX;
+    const dy = e.clientY - this.swipeStartY;
+    if (!this.swipeMoved) {
+      // 수평 의도가 분명할 때만 제스처 시작
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+      this.swipeMoved = true;
+      this.swipeEl.setPointerCapture(e.pointerId);
+    }
+    this.swipeEl.style.transition = 'none';
+    this.swipeEl.style.transform = `translateX(${Math.max(0, dx)}px)`;
+  }
+
+  private onSwipeEnd(e: PointerEvent, n: NotificationRow): void {
+    const el = this.swipeEl;
+    this.swipeEl = null;
+    if (!el || !this.swipeMoved) return;
+    el.style.transition = 'transform 0.18s ease-out';
+    el.style.transform = 'translateX(0)';
+    if (e.clientX - this.swipeStartX > 80) void this.markRead(n);
+  }
+
+  private async retry(n: NotificationRow, e: Event): Promise<void> {
+    e.stopPropagation();
+    await api(`/api/notifications/${n.id}/retry`, { method: 'POST' });
     toast('재발송 큐에 넣었어요');
-    this.items = await api<NotificationRow[]>('/api/notifications?limit=50');
+    await this.load();
   }
 
   private renderItem(n: NotificationRow): TemplateResult {
-    const unread = this.unreadIds.has(n.id);
+    const unread = n.status === 'sent' && n.read_at === null;
+    const info = findProviderById(n.source);
     return html`
-      <div class="item ${unread ? 'unread' : ''}">
+      <div
+        class="item ${unread ? 'unread' : ''} ${n.read_at ? 'read' : ''} ${n.url ? 'linked' : ''}"
+        @click=${(): void => void this.openLink(n)}
+        @pointerdown=${(e: PointerEvent): void => this.onSwipeStart(e, n)}
+        @pointermove=${(e: PointerEvent): void => this.onSwipeMove(e)}
+        @pointerup=${(e: PointerEvent): void => this.onSwipeEnd(e, n)}
+        @pointercancel=${(e: PointerEvent): void => this.onSwipeEnd(e, n)}
+      >
+        ${info ? providerAvatar(info.provider, 36) : nothing}
+        <div class="content">
         <span class="title">${n.title}</span>
         ${n.body ? html`<span class="body">${n.body}</span>` : nothing}
         <span class="meta">
@@ -118,7 +202,7 @@ export class NotificationsView extends LitElement {
           ${n.status === 'failed'
             ? html`
                 <span class="fail">발송 실패</span>
-                <button class="btn-soft" @click=${(): void => void this.retry(n.id)}>
+                <button class="btn-soft" @click=${(e: Event): void => void this.retry(n, e)}>
                   ${icon('refresh', 13)} 재시도
                 </button>
               `
@@ -127,8 +211,22 @@ export class NotificationsView extends LitElement {
             ? html`<span>· 발송 중</span>`
             : nothing}
         </span>
+        </div>
       </div>
     `;
+  }
+
+  // 전부 읽음 처리 + 앱 배지 초기화
+  private async readAll(): Promise<void> {
+    await api('/api/notifications/read-all', { method: 'POST' });
+    const now = new Date().toISOString();
+    for (const n of this.items ?? []) {
+      if (n.status === 'sent' && n.read_at === null) n.read_at = now;
+    }
+    this.requestUpdate();
+    const nav = navigator as Navigator & { clearAppBadge?: () => Promise<void> };
+    void nav.clearAppBadge?.().catch(() => {});
+    toast('모두 읽음 처리했어요');
   }
 
   render(): TemplateResult {
@@ -138,6 +236,12 @@ export class NotificationsView extends LitElement {
           ${icon('chevron-left', 22)}
         </button>
         <h1>알림</h1>
+        ${this.items?.some((n) => n.status === 'sent' && n.read_at === null)
+          ? html`
+              <button class="btn-ghost" style="margin-left:auto"
+                @click=${(): void => void this.readAll()}>모두 읽기</button>
+            `
+          : nothing}
       </div>
 
       ${this.items === null
@@ -150,6 +254,8 @@ export class NotificationsView extends LitElement {
               </div>
             `
           : html`<div class="list">${this.items.map((n) => this.renderItem(n))}</div>`}
+
+      <confirm-sheet></confirm-sheet>
     `;
   }
 }
