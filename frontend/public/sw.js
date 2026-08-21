@@ -56,8 +56,9 @@ self.addEventListener('notificationclick', (event) => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const client = windows[0];
       if (client) {
-        await client.focus();
-        await client.navigate('/#/notifications').catch(() => {});
+        // navigate()는 iOS PWA에서 실패하므로 앱에 메시지를 보내 해시 라우팅으로 이동시킨다
+        try { await client.focus(); } catch (e) { /* 포커스 실패 무시 */ }
+        client.postMessage({ type: 'open-notifications' });
       } else {
         await self.clients.openWindow('/#/notifications');
       }

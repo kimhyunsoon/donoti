@@ -66,7 +66,8 @@ interface DigitalItemRes {
   data: {
     name: string;
     salePrice: number;
-    buyLimit: { maxBuyUnlimited: boolean; maxBuyAvailableCount: number } | null;
+    // 판매 상태 코드: N=판매중, S/O=품절('다 팔렸어요'), E/U=판매종료, R=판매전, P=점포변경, J=구매완료
+    itemStatus: string;
   } | null;
 }
 
@@ -81,11 +82,11 @@ async function fetchDigitalItem(
       `${API}/panda/api/v1/digital-grab/item?skuCode=${sku}&storeCode=${storeCode}`,
     );
     if (res.status !== 200 || !res.data) return null;
-    const limit = res.data.buyLimit;
     return {
       name: res.data.name,
       price: res.data.salePrice,
-      available: limit != null && (limit.maxBuyUnlimited || limit.maxBuyAvailableCount > 0),
+      // buyLimit 수치는 품절 지점에서도 양수일 수 있어 오탐을 낸다 (하남 사례) - itemStatus만 신뢰
+      available: res.data.itemStatus === 'N',
     };
   } catch {
     return null;

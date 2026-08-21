@@ -7,6 +7,7 @@ import { toast } from '../ui.js';
 import { relativeTime } from '../format.js';
 import { findProviderById, providerAvatar } from '../catalog.js';
 import '../sheets/confirm-sheet.js';
+import '../components/pull-refresh.js';
 import type { ConfirmSheet } from '../sheets/confirm-sheet.js';
 
 interface NotificationRow {
@@ -197,8 +198,6 @@ export class NotificationsView extends LitElement {
         ${n.body ? html`<span class="body">${n.body}</span>` : nothing}
         <span class="meta">
           <span>${relativeTime(n.created_at)}</span>
-          <span>·</span>
-          <span>${n.source}</span>
           ${n.status === 'failed'
             ? html`
                 <span class="fail">발송 실패</span>
@@ -231,6 +230,7 @@ export class NotificationsView extends LitElement {
 
   render(): TemplateResult {
     return html`
+      <pull-refresh @refresh=${(): void => void this.load()}>
       <div class="top">
         <button class="btn-icon" aria-label="뒤로" @click=${(): void => { location.hash = '#/home'; }}>
           ${icon('chevron-left', 22)}
@@ -256,6 +256,7 @@ export class NotificationsView extends LitElement {
           : html`<div class="list">${this.items.map((n) => this.renderItem(n))}</div>`}
 
       <confirm-sheet></confirm-sheet>
+      </pull-refresh>
     `;
   }
 }

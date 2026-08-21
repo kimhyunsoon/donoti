@@ -4,7 +4,8 @@ import { tokens, ui } from '../style.js';
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { setupPushOnce } from '../push.js';
-import { findProvider, providerAvatar } from '../catalog.js';
+import { CATALOG, findProvider, providerAvatar } from '../catalog.js';
+import '../components/pull-refresh.js';
 import { summarizeSchedule, nextRunAt, formatUntil, type ScheduleRule } from '../schedule.js';
 import { formatEndsAt, relativeTime } from '../format.js';
 import { toast } from '../ui.js';
@@ -63,6 +64,14 @@ export class HomeView extends LitElement {
         background: var(--accent);
       }
       .list { display: flex; flex-direction: column; gap: 8px; }
+      /* 대메뉴(카테고리) 섹션 라벨 */
+      .section-label {
+        margin: 16px 4px 8px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-sub);
+      }
+      .section-label:first-of-type { margin-top: 0; }
       .item {
         background: var(--surface);
         border-radius: 16px;
@@ -283,7 +292,13 @@ export class HomeView extends LitElement {
   }
 
   render(): TemplateResult {
+    // 대메뉴(카테고리)별로 묶어 카탈로그 순서로 정렬
+    const groups = CATALOG.map((c) => ({
+      label: c.label,
+      items: (this.watches ?? []).filter((w) => w.category === c.id),
+    })).filter((g) => g.items.length > 0);
     return html`
+      <pull-refresh @refresh=${(): void => this.refresh()}>
       <header>
         <img src="/logo-text.png" alt="두노티">
         <button class="btn-icon" aria-label="알림 만들기" @click=${(): void => { location.hash = '#/watch/new'; }}>
@@ -310,9 +325,15 @@ export class HomeView extends LitElement {
                 </button>
               </div>
             `
-          : html`<div class="list">${this.watches.map((w) => this.renderItem(w))}</div>`}
+          : groups.map(
+              (g) => html`
+                <div class="section-label">${g.label}</div>
+                <div class="list">${g.items.map((w) => this.renderItem(w))}</div>
+              `,
+            )}
 
       <confirm-sheet></confirm-sheet>
+      </pull-refresh>
     `;
   }
 }

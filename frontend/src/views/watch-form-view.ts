@@ -623,19 +623,23 @@ export class WatchFormView extends LitElement {
         style="background:var(--bg);padding:10px 14px;margin-bottom:8px"
         @input=${(e: Event): void => { this.cgvMovieQuery = (e.target as HTMLInputElement).value; }}
       >
-      <div class="store-list">
-        ${this.cgvMovies === null
-          ? html`<p class="sub" style="padding:10px 2px">상영작을 불러오는 중...</p>`
-          : movies.map(
-              (m) => html`
-                <button class="store-row" @click=${(): void => {
-                  this.applyConfig({ ...this.config, movieNo: m.code, movieName: m.name });
-                }}>
-                  <span class="names"><b>${m.name}</b></span>
-                </button>
-              `,
-            )}
-      </div>
+      ${this.cgvMovies === null
+        ? html`<p class="sub" style="margin:4px 0 0">상영작을 불러오는 중...</p>`
+        : movies.length === 0
+          ? html`<p class="sub" style="margin:4px 0 0">검색 결과가 없어요</p>`
+          : html`
+              <div class="store-list">
+                ${movies.map(
+                  (m) => html`
+                    <button class="store-row" @click=${(): void => {
+                      this.applyConfig({ ...this.config, movieNo: m.code, movieName: m.name });
+                    }}>
+                      <span class="names"><b>${m.name}</b></span>
+                    </button>
+                  `,
+                )}
+              </div>
+            `}
     `;
   }
 
@@ -679,18 +683,22 @@ export class WatchFormView extends LitElement {
         style="background:var(--bg);padding:10px 14px;margin-bottom:8px"
         @input=${(e: Event): void => { this.cgvTheaterQuery = (e.target as HTMLInputElement).value; }}
       >
-      <div class="store-list" style="max-height:200px">
-        ${candidates.map(
-          (t) => html`
-            <button class="store-row" @click=${(): void => this.toggleEmartStore(t)}>
-              <span class="names">
-                <b>${t.name}</b>
-                <span class="sub">${t.area}</span>
-              </span>
-            </button>
-          `,
-        )}
-      </div>
+      ${candidates.length > 0
+        ? html`
+            <div class="store-list" style="max-height:200px">
+              ${candidates.map(
+                (t) => html`
+                  <button class="store-row" @click=${(): void => this.toggleEmartStore(t)}>
+                    <span class="names">
+                      <b>${t.name}</b>
+                      <span class="sub">${t.area}</span>
+                    </span>
+                  </button>
+                `,
+              )}
+            </div>
+          `
+        : html`<p class="sub" style="margin:4px 0 0">검색 결과가 없어요</p>`}
 
       <div class="frow" style="margin:6px 0 0">
         <span class="lbl">날짜</span>
@@ -816,18 +824,22 @@ export class WatchFormView extends LitElement {
               style="background:var(--bg);padding:10px 14px;margin-bottom:8px"
               @input=${(e: Event): void => { this.emartStoreQuery = (e.target as HTMLInputElement).value; }}
             >
-            <div class="store-list">
-              ${stores.map(
-                (s) => html`
-                  <button class="store-row" @click=${(): void => this.toggleEmartStore(s)}>
-                    <span class="names">
-                      <b>${s.name}</b>
-                      <span class="sub">${s.area}</span>
-                    </span>
-                  </button>
-                `,
-              )}
-            </div>
+            ${stores.length > 0
+              ? html`
+                  <div class="store-list">
+                    ${stores.map(
+                      (s) => html`
+                        <button class="store-row" @click=${(): void => this.toggleEmartStore(s)}>
+                          <span class="names">
+                            <b>${s.name}</b>
+                            <span class="sub">${s.area}</span>
+                          </span>
+                        </button>
+                      `,
+                    )}
+                  </div>
+                `
+              : html`<p class="sub" style="margin:4px 0 0">검색 결과가 없어요</p>`}
           `
         : nothing}
 

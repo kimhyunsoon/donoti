@@ -229,7 +229,8 @@ export const sheet = css`
   .panel-head h2 { font-size: 1.05rem; margin: 0; }
   .panel-body {
     overflow-y: auto;
-    padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+    /* 하단은 홈 인디케이터(safe-area)만큼만 - 여백을 더 주면 완료 버튼이 떠 보인다 */
+    padding: 0 16px max(10px, env(safe-area-inset-bottom, 10px));
     -webkit-overflow-scrolling: touch;
   }
   @keyframes slide-up { from { transform: translateY(45%); opacity: 0.6; } }

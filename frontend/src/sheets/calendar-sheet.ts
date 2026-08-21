@@ -201,7 +201,7 @@ export class CalendarSheet extends SheetBase {
       </div>
       ${this.multi
         ? html`
-            <button class="btn-primary" style="margin-bottom:14px" @click=${(): void => this.confirmMulti()}>
+            <button class="btn-primary" @click=${(): void => this.confirmMulti()}>
               완료${this.multiSelected.size > 0 ? ` (${this.multiSelected.size}일)` : ''}
             </button>
           `
