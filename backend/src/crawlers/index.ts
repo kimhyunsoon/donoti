@@ -2,6 +2,7 @@ import { fxCrawler } from './fx.js';
 import { stockCrawler } from './stock.js';
 import { emartCrawler } from './emart.js';
 import { nintendoCrawler } from './nintendo.js';
+import { playstationCrawler } from './playstation.js';
 import { cgvCrawler } from './cgv.js';
 import { lotteCrawler } from './lotte.js';
 import { megaboxCrawler } from './megabox.js';
@@ -52,6 +53,7 @@ const registry: Record<string, Crawler> = {
   stock: stockCrawler,
   emart: emartCrawler,
   nintendo: nintendoCrawler,
+  playstation: playstationCrawler,
   cgv: cgvCrawler,
   lotte: lotteCrawler,
   megabox: megaboxCrawler,

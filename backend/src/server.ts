@@ -15,6 +15,7 @@ import { watchRoutes } from './routes/watches.js';
 import { stockRoutes } from './routes/stocks.js';
 import { emartRoutes } from './routes/emart.js';
 import { nintendoRoutes } from './routes/nintendo.js';
+import { playstationRoutes } from './routes/playstation.js';
 import { cgvRoutes } from './routes/cgv.js';
 import { lotteRoutes } from './routes/lotte.js';
 import { megaboxRoutes } from './routes/megabox.js';
@@ -58,6 +59,7 @@ async function buildServer(): Promise<FastifyInstance> {
   await app.register(stockRoutes, { prefix: '/api/stocks' });
   await app.register(emartRoutes, { prefix: '/api/emart' });
   await app.register(nintendoRoutes, { prefix: '/api/nintendo' });
+  await app.register(playstationRoutes, { prefix: '/api/playstation' });
   await app.register(cgvRoutes, { prefix: '/api/cgv' });
   await app.register(lotteRoutes, { prefix: '/api/lotte' });
   await app.register(megaboxRoutes, { prefix: '/api/megabox' });

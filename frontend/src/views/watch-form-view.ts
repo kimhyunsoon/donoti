@@ -52,12 +52,27 @@ interface EmartResolved {
 
 const EMART_TYPE_LABELS: Record<string, string> = { digital: '픽업', product: '매장' };
 
-// 닌텐도 스토어 링크 해석 결과 (backend /api/nintendo/resolve)
-interface NintendoResolved {
+// 링크 붙여넣기형 가격 감시 provider들 (/api/<provider>/resolve 규약 공유)
+const SHOP_PROVIDERS = ['nintendo', 'playstation'];
+
+const SHOP_PLACEHOLDERS: Record<string, string> = {
+  nintendo: '닌텐도 스토어 상품 링크 붙여넣기',
+  playstation: '플레이스테이션 스토어 게임 링크 붙여넣기',
+};
+
+const SHOP_HINTS: Record<string, string> = {
+  nintendo: 'store.nintendo.co.kr 상품 페이지 주소를 넣어 주세요.',
+  playstation: 'store.playstation.com 게임 페이지 주소를 넣어 주세요.',
+};
+
+// 스토어 링크 해석 결과 (backend /api/<provider>/resolve)
+interface ShopResolved {
   productId: string;
   name: string;
   price: number;
   regularPrice: number;
+  // PS Plus 전용가 (플레이스테이션 전용, 없으면 null)
+  plusPrice?: number | null;
   link: string;
 }
 
@@ -243,10 +258,10 @@ export class WatchFormView extends LitElement {
   @state() private emartInfo: EmartResolved | null = null;
   @state() private emartLoading = false;
   @state() private emartStoreQuery = '';
-  // 닌텐도 링크 해석 상태
-  @state() private nintendoLink = '';
-  @state() private nintendoInfo: NintendoResolved | null = null;
-  @state() private nintendoLoading = false;
+  // 스토어(닌텐도·플레이스테이션) 링크 해석 상태
+  @state() private shopLink = '';
+  @state() private shopInfo: ShopResolved | null = null;
+  @state() private shopLoading = false;
   // CGV 목록 상태
   @state() private cgvMovies: CgvMovie[] | null = null;
   @state() private cgvTheaters: CgvTheater[] | null = null;
@@ -304,13 +319,13 @@ export class WatchFormView extends LitElement {
         .then((info) => { this.emartInfo = info; })
         .catch(() => {});
     }
-    // 닌텐도 수정: 현재 가격 표시를 위해 다시 해석 (실패해도 기존 설정으로 표시)
-    if (row.provider === 'nintendo' && typeof this.config.link === 'string') {
-      void api<NintendoResolved>('/api/nintendo/resolve', {
+    // 스토어 수정: 현재 가격 표시를 위해 다시 해석 (실패해도 기존 설정으로 표시)
+    if (SHOP_PROVIDERS.includes(row.provider) && typeof this.config.link === 'string') {
+      void api<ShopResolved>(`/api/${row.provider}/resolve`, {
         method: 'POST',
         body: JSON.stringify({ url: this.config.link }),
       })
-        .then((info) => { this.nintendoInfo = info; })
+        .then((info) => { this.shopInfo = info; })
         .catch(() => {});
     }
     if (row.ends_at) {
@@ -347,7 +362,8 @@ export class WatchFormView extends LitElement {
       return config.kind === 'index' ? `${config.name} 지수` : `${config.name} 주가`;
     }
     if (provider === 'emart' && typeof config.name === 'string') return config.name;
-    if (provider === 'nintendo' && typeof config.name === 'string') return config.name;
+    if (provider === 'playstation' && config.mode === 'plusMonthly') return 'PS Plus 무료 게임';
+    if (SHOP_PROVIDERS.includes(provider) && typeof config.name === 'string') return config.name;
     if (MOVIE_PROVIDERS.includes(provider) && typeof config.movieName === 'string') return config.movieName;
     return '';
   }
@@ -429,16 +445,16 @@ export class WatchFormView extends LitElement {
     this.config = { endOnStock: this.config.endOnStock, onlyInStock: this.config.onlyInStock };
   }
 
-  // 닌텐도 스토어 링크 해석 - 성공 시 상품·가격 확보
-  private async resolveNintendo(): Promise<void> {
-    if (this.nintendoLink.trim() === '' || this.nintendoLoading) return;
-    this.nintendoLoading = true;
+  // 스토어 링크 해석 - 성공 시 상품·가격 확보
+  private async resolveShop(): Promise<void> {
+    if (this.shopLink.trim() === '' || this.shopLoading) return;
+    this.shopLoading = true;
     try {
-      const info = await api<NintendoResolved>('/api/nintendo/resolve', {
+      const info = await api<ShopResolved>(`/api/${this.providerId}/resolve`, {
         method: 'POST',
-        body: JSON.stringify({ url: this.nintendoLink }),
+        body: JSON.stringify({ url: this.shopLink }),
       });
-      this.nintendoInfo = info;
+      this.shopInfo = info;
       this.applyConfig({
         ...this.config,
         productId: info.productId,
@@ -449,14 +465,14 @@ export class WatchFormView extends LitElement {
       const message = err instanceof Error && !err.message.startsWith('api_error') ? err.message : '';
       toast(message || '링크를 불러오지 못했어요');
     } finally {
-      this.nintendoLoading = false;
+      this.shopLoading = false;
     }
   }
 
-  // 닌텐도 링크·상품 선택 초기화 (알림 옵션은 유지)
-  private resetNintendo(): void {
-    this.nintendoInfo = null;
-    this.nintendoLink = '';
+  // 스토어 링크·상품 선택 초기화 (알림 옵션은 유지)
+  private resetShop(): void {
+    this.shopInfo = null;
+    this.shopLink = '';
     this.config = { onPriceChange: this.config.onPriceChange };
   }
 
@@ -501,8 +517,12 @@ export class WatchFormView extends LitElement {
         return null;
       }
     }
-    if (this.providerId === 'nintendo' && typeof this.config.productId !== 'string') {
-      toast('닌텐도 스토어 링크를 불러와 주세요');
+    if (
+      SHOP_PROVIDERS.includes(this.providerId) &&
+      this.config.mode !== 'plusMonthly' &&
+      typeof this.config.productId !== 'string'
+    ) {
+      toast('스토어 링크를 불러와 주세요');
       return null;
     }
     if (MOVIE_PROVIDERS.includes(this.providerId)) {
@@ -625,7 +645,7 @@ export class WatchFormView extends LitElement {
     }
     if (this.providerId === 'stock') return this.renderStockConfig();
     if (this.providerId === 'emart') return this.renderEmartConfig();
-    if (this.providerId === 'nintendo') return this.renderNintendoConfig();
+    if (SHOP_PROVIDERS.includes(this.providerId)) return this.renderShopConfig();
     if (MOVIE_PROVIDERS.includes(this.providerId)) return this.renderCgvConfig();
     return html`<p class="sub" style="margin:0">상세 설정은 준비 중이에요. 다음 업데이트에서 제공돼요.</p>`;
   }
@@ -916,43 +936,91 @@ export class WatchFormView extends LitElement {
     `;
   }
 
-  // 닌텐도 - 스토어 상품 링크 입력 → 상품·가격 확인 → 가격 변동 알림 옵션
-  private renderNintendoConfig(): TemplateResult {
-    if (typeof this.config.productId !== 'string') {
-      const validLink = /^https?:\/\/\S+/.test(this.nintendoLink.trim());
+  // 플레이스테이션 감시 종류 전환 (게임 가격 ↔ PS Plus 무료 게임 목록)
+  private setShopMode(mode: 'price' | 'plusMonthly'): void {
+    if ((this.config.mode === 'plusMonthly' ? 'plusMonthly' : 'price') === mode) return;
+    this.shopInfo = null;
+    this.shopLink = '';
+    this.config = mode === 'plusMonthly' ? { mode } : {};
+  }
+
+  // 닌텐도·플레이스테이션 - 스토어 링크 입력 → 상품·가격 확인 → 가격 변동 알림 옵션
+  // 플레이스테이션은 링크 대신 PS Plus 월간 무료 게임 목록 감시도 선택 가능
+  private renderShopConfig(): TemplateResult {
+    const mode = this.config.mode === 'plusMonthly' ? 'plusMonthly' : 'price';
+    const modePicker =
+      this.providerId === 'playstation'
+        ? html`
+            <div class="frow" style="min-height:auto;margin-bottom:12px">
+              <span class="lbl">종류</span>
+              <div class="segmented" style="width:230px">
+                <button class=${mode === 'price' ? 'on' : ''}
+                  @click=${(): void => this.setShopMode('price')}>게임 가격</button>
+                <button class=${mode === 'plusMonthly' ? 'on' : ''}
+                  @click=${(): void => this.setShopMode('plusMonthly')}>PS Plus 무료</button>
+              </div>
+            </div>
+          `
+        : nothing;
+
+    if (mode === 'plusMonthly') {
       return html`
-        <div class="link-line">
-          <input
-            .value=${this.nintendoLink}
-            placeholder="닌텐도 스토어 상품 링크 붙여넣기"
-            style="background:var(--bg)"
-            @input=${(e: Event): void => { this.nintendoLink = (e.target as HTMLInputElement).value; }}
-            @keydown=${(e: KeyboardEvent): void => { if (e.key === 'Enter') void this.resolveNintendo(); }}
-          >
-          <button class="link-go" aria-label="상품 불러오기"
-            ?disabled=${!validLink || this.nintendoLoading}
-            @click=${(): void => void this.resolveNintendo()}>
-            ${icon('arrow-right', 19)}
-          </button>
+        ${modePicker}
+        <p class="sub" style="margin:0 0 14px">
+          매달 바뀌는 PS Plus 무료 게임 목록을 알려드려요.
+        </p>
+        <div class="frow" style="min-height:auto">
+          <span style="font-weight:700;font-size:0.92rem">목록 변동 시에만 알림</span>
+          <label class="switch">
+            <input type="checkbox" ?checked=${this.config.onListChange !== false}
+              @change=${(e: Event): void => {
+                this.applyConfig({ ...this.config, onListChange: (e.target as HTMLInputElement).checked });
+              }}>
+            <span class="knob"></span>
+          </label>
         </div>
-        <p class="sub" style="margin:8px 0 0">store.nintendo.co.kr 상품 페이지 주소를 넣어 주세요.</p>
+        <p class="sub" style="margin:6px 0 0">처음 1회는 항상 알림이 와요. 끄면 확인할 때마다 알림이 와요</p>
       `;
     }
 
-    const info = this.nintendoInfo;
+    if (typeof this.config.productId !== 'string') {
+      const validLink = /^https?:\/\/\S+/.test(this.shopLink.trim());
+      return html`
+        ${modePicker}
+        <div class="link-line">
+          <input
+            .value=${this.shopLink}
+            placeholder=${SHOP_PLACEHOLDERS[this.providerId] ?? '스토어 링크 붙여넣기'}
+            style="background:var(--bg)"
+            @input=${(e: Event): void => { this.shopLink = (e.target as HTMLInputElement).value; }}
+            @keydown=${(e: KeyboardEvent): void => { if (e.key === 'Enter') void this.resolveShop(); }}
+          >
+          <button class="link-go" aria-label="상품 불러오기"
+            ?disabled=${!validLink || this.shopLoading}
+            @click=${(): void => void this.resolveShop()}>
+            ${icon('arrow-right', 19)}
+          </button>
+        </div>
+        <p class="sub" style="margin:8px 0 0">${SHOP_HINTS[this.providerId] ?? ''}</p>
+      `;
+    }
+
+    const info = this.shopInfo;
     const discounted = info !== null && info.price < info.regularPrice;
-    const priceText = info === null
+    let priceText = info === null
       ? ''
       : discounted
         ? `${info.price.toLocaleString('ko-KR')}원 · ${Math.round((1 - info.price / info.regularPrice) * 100)}% 할인 (정가 ${info.regularPrice.toLocaleString('ko-KR')}원)`
         : `${info.price.toLocaleString('ko-KR')}원`;
+    if (info?.plusPrice != null) priceText += ` · PS Plus ${info.plusPrice.toLocaleString('ko-KR')}원`;
     return html`
+      ${modePicker}
       <div class="stock-sel" style="margin-bottom:14px">
         <span class="names">
           <b>${this.config.name}</b>
           ${priceText !== '' ? html`<span class="sub">${priceText}</span>` : nothing}
         </span>
-        <button class="btn-ghost" @click=${(): void => this.resetNintendo()}>변경</button>
+        <button class="btn-ghost" @click=${(): void => this.resetShop()}>변경</button>
       </div>
 
       <div class="frow" style="min-height:auto">

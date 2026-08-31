@@ -1,6 +1,6 @@
 // 알림 종류 2뎁스 카탈로그: 카테고리 > 제공자 (frontend/src/catalog.ts와 동기 유지)
 export const CATALOG: Readonly<Record<string, readonly string[]>> = {
-  inventory: ['emart', 'nintendo'],
+  inventory: ['emart', 'nintendo', 'playstation'],
   movie: ['cgv', 'lotte', 'megabox'],
   price: ['fx', 'stock'],
 };
@@ -14,6 +14,7 @@ export function isValidTarget(category: string, provider: string): boolean {
 const PROVIDER_EMOJI: Record<string, string> = {
   emart: '🛒',
   nintendo: '🎮',
+  playstation: '🎮',
   cgv: '🎬',
   lotte: '🎬',
   megabox: '🎬',
@@ -25,6 +26,7 @@ const PROVIDER_EMOJI: Record<string, string> = {
 const PROVIDER_LABELS: Record<string, string> = {
   emart: '이마트',
   nintendo: '닌텐도',
+  playstation: 'PS Store',
   cgv: 'CGV',
   lotte: '롯데시네마',
   megabox: '메가박스',
