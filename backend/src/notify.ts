@@ -1,11 +1,16 @@
 import webpush from 'web-push';
 import { db } from './db.js';
 import { config } from './config.js';
+import { groupNotificationTitle } from './catalog.js';
 
 const MAX_ATTEMPTS = 5;
 // 재시도 백오프: 10초 → 1분 → 5분 → 15분
 const BACKOFF_MS = [10_000, 60_000, 300_000, 900_000];
 const POLL_MS = 5_000;
+// 같은 회차에 쌓인 같은 종류(source)는 브라우저 알림 하나로 합친다 - 넘치면 나눠서 발송
+const GROUP_MAX = 4;
+// 합쳐진 본문의 항목당 최대 길이 (넘으면 말줄임)
+const GROUP_LINE_MAX = 50;
 // 발송 완료 알림 보관 기간 (failed는 수동 확인용이라 자동 삭제하지 않음)
 const SENT_RETENTION = "-30 days";
 
@@ -50,24 +55,47 @@ export function enqueueNotification(input: NotificationInput): number {
   return Number(result.lastInsertRowid);
 }
 
-// 모든 구독 기기로 Web Push 발송. 만료 구독(404/410)은 정리하고 전달 수를 반환.
-// 구독이 있는데 전부 실패하면 throw → 큐 재시도로 이어진다
-async function broadcast(row: NotificationRow, log: (msg: string) => void): Promise<number> {
+// 합쳐진 알림의 항목 한 줄: 개별 제목(이모지 제외) + 본문 첫 줄
+function summaryLine(row: NotificationRow): string {
+  const title = row.title.replace(/^[\p{Extended_Pictographic}\u{FE0F}\u{200D}]+\s*/u, '');
+  const firstBody = row.body.split('\n')[0]?.trim() ?? '';
+  const line = firstBody ? `${title} · ${firstBody}` : title;
+  return line.length > GROUP_LINE_MAX ? `${line.slice(0, GROUP_LINE_MAX - 1)}…` : line;
+}
+
+// 브라우저 알림 페이로드. 2건 이상이면 제목·본문을 합치고 ids로 일괄 읽음 처리를 지원한다
+function buildPayload(rows: NotificationRow[], unread: number): string {
+  if (rows.length === 1) {
+    const row = rows[0]!;
+    return JSON.stringify({
+      // id: OS 알림 클릭 시 서비스워커가 해당 알림을 읽음 처리하는 데 사용
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      url: row.url ?? '/',
+      unread,
+    });
+  }
+  return JSON.stringify({
+    ids: rows.map((r) => r.id),
+    title: groupNotificationTitle(rows[0]!.source, rows.length),
+    body: rows.map(summaryLine).join('\n'),
+    url: '/',
+    unread,
+  });
+}
+
+// 모든 구독 기기로 Web Push 발송 (같은 종류 묶음은 알림 1개로 합쳐서). 만료 구독(404/410)은
+// 정리하고 전달 수를 반환. 구독이 있는데 전부 실패하면 throw → 큐 재시도로 이어진다
+async function broadcast(rows: NotificationRow[], log: (msg: string) => void): Promise<number> {
   const subs = db.prepare('SELECT * FROM push_subscriptions').all() as SubRow[];
   if (subs.length === 0) return 0;
 
-  // unread = 앱 아이콘 배지 카운트 (이번 알림 포함) - 서비스워커가 setAppBadge에 사용
+  // unread = 앱 아이콘 배지 카운트 (이번 묶음 포함) - 서비스워커가 setAppBadge에 사용
   const prev = db
     .prepare(`SELECT COUNT(*) AS c FROM notifications WHERE status = 'sent' AND read_at IS NULL`)
     .get() as { c: number };
-  const payload = JSON.stringify({
-    // id: OS 알림 클릭 시 서비스워커가 해당 알림을 읽음 처리하는 데 사용
-    id: row.id,
-    title: row.title,
-    body: row.body,
-    url: row.url ?? '/',
-    unread: prev.c + 1,
-  });
+  const payload = buildPayload(rows, prev.c + rows.length);
   let delivered = 0;
   let lastError = '';
   for (const sub of subs) {
@@ -121,32 +149,52 @@ export function startNotifier(log: (msg: string) => void): () => void {
         )
         .all(Date.now()) as NotificationRow[];
 
-      for (const row of rows) {
-        db.prepare(`UPDATE notifications SET status = 'sending' WHERE id = ?`).run(row.id);
-        try {
-          const delivered = await broadcast(row, log);
-          db.prepare(
-            `UPDATE notifications
-             SET status = 'sent', delivered = ?, sent_at = datetime('now'), last_error = NULL
-             WHERE id = ?`,
-          ).run(delivered, row.id);
-          log(`알림 발송 완료: ${row.source} "${row.title}" (${delivered}기기)`);
-        } catch (err) {
-          const attempts = row.attempts + 1;
-          const message = err instanceof Error ? err.message : String(err);
-          if (attempts >= MAX_ATTEMPTS) {
-            db.prepare(
-              `UPDATE notifications SET status = 'failed', attempts = ?, last_error = ? WHERE id = ?`,
-            ).run(attempts, message, row.id);
-            log(`알림 최종 실패: ${row.source} "${row.title}" - ${message}`);
-          } else {
-            const backoff = BACKOFF_MS[Math.min(attempts - 1, BACKOFF_MS.length - 1)]!;
-            db.prepare(
-              `UPDATE notifications
-               SET status = 'pending', attempts = ?, next_attempt_at = ?, last_error = ?
-               WHERE id = ?`,
-            ).run(attempts, Date.now() + backoff, message, row.id);
-            log(`알림 발송 실패 (${attempts}/${MAX_ATTEMPTS}), ${backoff / 1000}초 후 재시도: ${message}`);
+      // 같은 종류(source)끼리 묶는다 - 알림센터 행은 그대로 두고 브라우저 알림만 합쳐진다
+      const groups = new Map<string, NotificationRow[]>();
+      for (const row of rows) groups.set(row.source, [...(groups.get(row.source) ?? []), row]);
+
+      for (const group of groups.values()) {
+        // 너무 길어지지 않게 GROUP_MAX건씩 나눠서 발송
+        for (let i = 0; i < group.length; i += GROUP_MAX) {
+          const chunk = group.slice(i, i + GROUP_MAX);
+          for (const row of chunk) {
+            db.prepare(`UPDATE notifications SET status = 'sending' WHERE id = ?`).run(row.id);
+          }
+          const label =
+            chunk.length === 1 ? `"${chunk[0]!.title}"` : `${chunk.length}건 (합쳐서 발송)`;
+          try {
+            const delivered = await broadcast(chunk, log);
+            for (const row of chunk) {
+              db.prepare(
+                `UPDATE notifications
+                 SET status = 'sent', delivered = ?, sent_at = datetime('now'), last_error = NULL
+                 WHERE id = ?`,
+              ).run(delivered, row.id);
+            }
+            log(`알림 발송 완료: ${chunk[0]!.source} ${label} (${delivered}기기)`);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            for (const row of chunk) {
+              const attempts = row.attempts + 1;
+              if (attempts >= MAX_ATTEMPTS) {
+                db.prepare(
+                  `UPDATE notifications SET status = 'failed', attempts = ?, last_error = ? WHERE id = ?`,
+                ).run(attempts, message, row.id);
+              } else {
+                const backoff = BACKOFF_MS[Math.min(attempts - 1, BACKOFF_MS.length - 1)]!;
+                db.prepare(
+                  `UPDATE notifications
+                   SET status = 'pending', attempts = ?, next_attempt_at = ?, last_error = ?
+                   WHERE id = ?`,
+                ).run(attempts, Date.now() + backoff, message, row.id);
+              }
+            }
+            const finals = chunk.filter((r) => r.attempts + 1 >= MAX_ATTEMPTS).length;
+            log(
+              finals === chunk.length
+                ? `알림 최종 실패: ${chunk[0]!.source} ${label} - ${message}`
+                : `알림 발송 실패: ${chunk[0]!.source} ${label} - ${message} (재시도 예약)`,
+            );
           }
         }
       }

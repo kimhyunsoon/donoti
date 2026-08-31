@@ -13,7 +13,8 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title ?? '두노티', {
       body: data.body ?? '',
       icon: '/icons/icon-192.png',
-      data: { id: data.id ?? null },
+      // ids: 같은 종류가 합쳐진 알림 - 클릭 시 전부 읽음 처리
+      data: { id: data.id ?? null, ids: data.ids ?? null },
     }),
   ];
   // 앱 아이콘 배지 (iOS 16.4+ 설치형 PWA·안드로이드 크롬 지원) - 안읽은 수는 서버가 계산해 페이로드에 포함
@@ -33,25 +34,28 @@ self.addEventListener('push', (event) => {
 // OS 알림 클릭 → 해당 알림 읽음 처리 + 앱 배지 갱신 + 알림센터로 이동
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const id = event.notification.data?.id;
+  const data = event.notification.data ?? {};
+  const ids = Array.isArray(data.ids) ? data.ids : data.id ? [data.id] : [];
   event.waitUntil(
     (async () => {
-      if (id) {
+      let unread = null;
+      for (const id of ids) {
         try {
           const res = await fetch(`/api/notifications/${id}/read`, {
             method: 'POST',
             credentials: 'include',
           });
-          const data = await res.json();
-          if ('setAppBadge' in self.navigator && typeof data.unread === 'number') {
-            await (data.unread > 0
-              ? self.navigator.setAppBadge(data.unread)
-              : self.navigator.clearAppBadge()
-            ).catch(() => {});
-          }
+          const body = await res.json();
+          if (typeof body.unread === 'number') unread = body.unread;
         } catch {
           // 읽음 처리 실패는 무시 - 알림센터 이동은 계속
         }
+      }
+      if ('setAppBadge' in self.navigator && typeof unread === 'number') {
+        await (unread > 0
+          ? self.navigator.setAppBadge(unread)
+          : self.navigator.clearAppBadge()
+        ).catch(() => {});
       }
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const client = windows[0];

@@ -22,7 +22,10 @@ export const CATALOG: CategoryInfo[] = [
   {
     id: 'inventory',
     label: '쇼핑',
-    providers: [{ id: 'emart', label: '이마트', image: '/brands/emart.jpg' }],
+    providers: [
+      { id: 'emart', label: '이마트', image: '/brands/emart.jpg' },
+      { id: 'nintendo', label: '닌텐도 eShop', image: '/brands/nintendo.jpg' },
+    ],
   },
   {
     id: 'movie',

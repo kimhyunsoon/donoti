@@ -31,6 +31,16 @@ export async function ensureSubscribed(): Promise<boolean> {
   return true;
 }
 
+// 알림을 켰을 때 확인용 브라우저 알림 (서버 왕복 없이 이 기기에만 표시)
+export async function showEnabledNotification(): Promise<void> {
+  if (!pushSupported() || Notification.permission !== 'granted') return;
+  const reg = await navigator.serviceWorker.ready;
+  await reg.showNotification('두노티', {
+    body: '알림이 켜졌어요. 이 기기로 알림을 보내드려요',
+    icon: '/icons/icon-192.png',
+  });
+}
+
 // 이 기기의 구독을 해지한다 (설정 스위치 끔)
 export async function unsubscribe(): Promise<void> {
   if (!pushSupported()) return;

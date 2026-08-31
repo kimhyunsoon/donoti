@@ -15,7 +15,7 @@
 
 - 발송 지점은 backend 프로세스 내장 워커(`notify.ts`) 하나뿐. 생산자는 `enqueueNotification()`만 호출한다.
 - 만료된 푸시 구독(404/410)은 발송 시 자동 정리된다.
-- 크롤러 주기·대상 등 설정은 `settings` 테이블에 `crawler.<name>.*` 키로 저장한다 (스키마 변경 불필요).
+- 크롤러 주기는 `watches.schedule`(JSON), provider별 폼 데이터는 `watches.config`(JSON)에 저장한다. 크롤러 전용 런타임 상태는 `watches.state`. 새 크롤러는 `crawlers/<provider>.ts`에 `Crawler{run, validateConfig}` 구현 후 `crawlers/index.ts` 레지스트리에 등록 - 전체 구조는 architecture.md 참고.
 
 ## 크롤링 앱 작성 시 디버깅 순서
 

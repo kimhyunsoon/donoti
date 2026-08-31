@@ -52,6 +52,15 @@ interface EmartResolved {
 
 const EMART_TYPE_LABELS: Record<string, string> = { digital: '픽업', product: '매장' };
 
+// 닌텐도 스토어 링크 해석 결과 (backend /api/nintendo/resolve)
+interface NintendoResolved {
+  productId: string;
+  name: string;
+  price: number;
+  regularPrice: number;
+  link: string;
+}
+
 interface CgvMovie {
   code: string;
   name: string;
@@ -234,6 +243,10 @@ export class WatchFormView extends LitElement {
   @state() private emartInfo: EmartResolved | null = null;
   @state() private emartLoading = false;
   @state() private emartStoreQuery = '';
+  // 닌텐도 링크 해석 상태
+  @state() private nintendoLink = '';
+  @state() private nintendoInfo: NintendoResolved | null = null;
+  @state() private nintendoLoading = false;
   // CGV 목록 상태
   @state() private cgvMovies: CgvMovie[] | null = null;
   @state() private cgvTheaters: CgvTheater[] | null = null;
@@ -291,6 +304,15 @@ export class WatchFormView extends LitElement {
         .then((info) => { this.emartInfo = info; })
         .catch(() => {});
     }
+    // 닌텐도 수정: 현재 가격 표시를 위해 다시 해석 (실패해도 기존 설정으로 표시)
+    if (row.provider === 'nintendo' && typeof this.config.link === 'string') {
+      void api<NintendoResolved>('/api/nintendo/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ url: this.config.link }),
+      })
+        .then((info) => { this.nintendoInfo = info; })
+        .catch(() => {});
+    }
     if (row.ends_at) {
       this.endsEnabled = true;
       this.endsDate = row.ends_at.slice(0, 10);
@@ -325,6 +347,7 @@ export class WatchFormView extends LitElement {
       return config.kind === 'index' ? `${config.name} 지수` : `${config.name} 주가`;
     }
     if (provider === 'emart' && typeof config.name === 'string') return config.name;
+    if (provider === 'nintendo' && typeof config.name === 'string') return config.name;
     if (MOVIE_PROVIDERS.includes(provider) && typeof config.movieName === 'string') return config.movieName;
     return '';
   }
@@ -406,6 +429,37 @@ export class WatchFormView extends LitElement {
     this.config = { endOnStock: this.config.endOnStock, onlyInStock: this.config.onlyInStock };
   }
 
+  // 닌텐도 스토어 링크 해석 - 성공 시 상품·가격 확보
+  private async resolveNintendo(): Promise<void> {
+    if (this.nintendoLink.trim() === '' || this.nintendoLoading) return;
+    this.nintendoLoading = true;
+    try {
+      const info = await api<NintendoResolved>('/api/nintendo/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ url: this.nintendoLink }),
+      });
+      this.nintendoInfo = info;
+      this.applyConfig({
+        ...this.config,
+        productId: info.productId,
+        name: info.name,
+        link: info.link,
+      });
+    } catch (err) {
+      const message = err instanceof Error && !err.message.startsWith('api_error') ? err.message : '';
+      toast(message || '링크를 불러오지 못했어요');
+    } finally {
+      this.nintendoLoading = false;
+    }
+  }
+
+  // 닌텐도 링크·상품 선택 초기화 (알림 옵션은 유지)
+  private resetNintendo(): void {
+    this.nintendoInfo = null;
+    this.nintendoLink = '';
+    this.config = { onPriceChange: this.config.onPriceChange };
+  }
+
   // 종목 검색 (250ms 디바운스)
   private onStockQuery(e: Event): void {
     this.stockQuery = (e.target as HTMLInputElement).value;
@@ -446,6 +500,10 @@ export class WatchFormView extends LitElement {
         toast('지점을 1곳 이상 선택해 주세요');
         return null;
       }
+    }
+    if (this.providerId === 'nintendo' && typeof this.config.productId !== 'string') {
+      toast('닌텐도 스토어 링크를 불러와 주세요');
+      return null;
     }
     if (MOVIE_PROVIDERS.includes(this.providerId)) {
       if (typeof this.config.movieNo !== 'string') {
@@ -567,6 +625,7 @@ export class WatchFormView extends LitElement {
     }
     if (this.providerId === 'stock') return this.renderStockConfig();
     if (this.providerId === 'emart') return this.renderEmartConfig();
+    if (this.providerId === 'nintendo') return this.renderNintendoConfig();
     if (MOVIE_PROVIDERS.includes(this.providerId)) return this.renderCgvConfig();
     return html`<p class="sub" style="margin:0">상세 설정은 준비 중이에요. 다음 업데이트에서 제공돼요.</p>`;
   }
@@ -854,6 +913,59 @@ export class WatchFormView extends LitElement {
         </label>
       </div>
       <p class="sub" style="margin:6px 0 0">끄면 재고가 없어도 매회 알림이 와요</p>
+    `;
+  }
+
+  // 닌텐도 - 스토어 상품 링크 입력 → 상품·가격 확인 → 가격 변동 알림 옵션
+  private renderNintendoConfig(): TemplateResult {
+    if (typeof this.config.productId !== 'string') {
+      const validLink = /^https?:\/\/\S+/.test(this.nintendoLink.trim());
+      return html`
+        <div class="link-line">
+          <input
+            .value=${this.nintendoLink}
+            placeholder="닌텐도 스토어 상품 링크 붙여넣기"
+            style="background:var(--bg)"
+            @input=${(e: Event): void => { this.nintendoLink = (e.target as HTMLInputElement).value; }}
+            @keydown=${(e: KeyboardEvent): void => { if (e.key === 'Enter') void this.resolveNintendo(); }}
+          >
+          <button class="link-go" aria-label="상품 불러오기"
+            ?disabled=${!validLink || this.nintendoLoading}
+            @click=${(): void => void this.resolveNintendo()}>
+            ${icon('arrow-right', 19)}
+          </button>
+        </div>
+        <p class="sub" style="margin:8px 0 0">store.nintendo.co.kr 상품 페이지 주소를 넣어 주세요.</p>
+      `;
+    }
+
+    const info = this.nintendoInfo;
+    const discounted = info !== null && info.price < info.regularPrice;
+    const priceText = info === null
+      ? ''
+      : discounted
+        ? `${info.price.toLocaleString('ko-KR')}원 · ${Math.round((1 - info.price / info.regularPrice) * 100)}% 할인 (정가 ${info.regularPrice.toLocaleString('ko-KR')}원)`
+        : `${info.price.toLocaleString('ko-KR')}원`;
+    return html`
+      <div class="stock-sel" style="margin-bottom:14px">
+        <span class="names">
+          <b>${this.config.name}</b>
+          ${priceText !== '' ? html`<span class="sub">${priceText}</span>` : nothing}
+        </span>
+        <button class="btn-ghost" @click=${(): void => this.resetNintendo()}>변경</button>
+      </div>
+
+      <div class="frow" style="min-height:auto">
+        <span style="font-weight:700;font-size:0.92rem">가격 변동 시에만 알림</span>
+        <label class="switch">
+          <input type="checkbox" ?checked=${this.config.onPriceChange !== false}
+            @change=${(e: Event): void => {
+              this.applyConfig({ ...this.config, onPriceChange: (e.target as HTMLInputElement).checked });
+            }}>
+          <span class="knob"></span>
+        </label>
+      </div>
+      <p class="sub" style="margin:6px 0 0">처음 1회는 항상 알림이 와요. 끄면 확인할 때마다 알림이 와요</p>
     `;
   }
 

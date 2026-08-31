@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { toast } from '../ui.js';
 import { applyTheme, currentTheme, type ThemeMode } from '../theme.js';
-import { ensureSubscribed, unsubscribe, isSubscribed } from '../push.js';
+import { ensureSubscribed, unsubscribe, isSubscribed, showEnabledNotification } from '../push.js';
 
 const THEME_LABEL: Record<ThemeMode, string> = { auto: '자동', light: '라이트', dark: '다크' };
 
@@ -39,6 +39,7 @@ export class SettingsView extends LitElement {
     if (on) {
       const ok = await ensureSubscribed().catch(() => false);
       if (!ok) toast('브라우저 알림 권한이 필요해요');
+      else void showEnabledNotification().catch(() => {});
       this.subscribed = ok;
       this.requestUpdate(); // 실패 시 스위치 원복
     } else {

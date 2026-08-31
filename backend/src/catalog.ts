@@ -1,6 +1,6 @@
 // 알림 종류 2뎁스 카탈로그: 카테고리 > 제공자 (frontend/src/catalog.ts와 동기 유지)
 export const CATALOG: Readonly<Record<string, readonly string[]>> = {
-  inventory: ['emart'],
+  inventory: ['emart', 'nintendo'],
   movie: ['cgv', 'lotte', 'megabox'],
   price: ['fx', 'stock'],
 };
@@ -13,6 +13,7 @@ export function isValidTarget(category: string, provider: string): boolean {
 // 알림 제목 앞에 붙는 provider별 이모지 (영화 3사는 동일, 쇼핑은 마트 아이콘)
 const PROVIDER_EMOJI: Record<string, string> = {
   emart: '🛒',
+  nintendo: '🎮',
   cgv: '🎬',
   lotte: '🎬',
   megabox: '🎬',
@@ -23,9 +24,17 @@ const PROVIDER_EMOJI: Record<string, string> = {
 // 영화·쇼핑은 어느 브랜드인지 제목에 표기 (시세는 이름만으로 충분)
 const PROVIDER_LABELS: Record<string, string> = {
   emart: '이마트',
+  nintendo: '닌텐도',
   cgv: 'CGV',
   lotte: '롯데시네마',
   megabox: '메가박스',
+};
+
+// 합쳐진 브라우저 알림 제목용 (개별 제목에 브랜드를 안 쓰는 fx·stock도 이름이 필요)
+const GROUP_LABELS: Record<string, string> = {
+  ...PROVIDER_LABELS,
+  fx: '환율',
+  stock: '주식',
 };
 
 /** 알림 제목: '🎬 CGV · 오디세이'처럼 이모지·브랜드 프리픽스를 붙인다 */
@@ -34,4 +43,11 @@ export function notificationTitle(provider: string, name: string): string {
   const label = PROVIDER_LABELS[provider];
   const text = label ? `${label} · ${name}` : name;
   return emoji ? `${emoji} ${text}` : text;
+}
+
+/** 같은 종류를 합친 브라우저 알림 제목: '🎬 CGV 알림 3건' */
+export function groupNotificationTitle(source: string, count: number): string {
+  const emoji = PROVIDER_EMOJI[source] ?? '🔔';
+  const label = GROUP_LABELS[source] ?? '두노티';
+  return `${emoji} ${label} 알림 ${count}건`;
 }
