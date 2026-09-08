@@ -90,6 +90,19 @@ interface CgvTheater {
 // 영화 폼(영화·지점·날짜·시간범위)을 공유하는 provider들
 const MOVIE_PROVIDERS = ['cgv', 'lotte', 'megabox'];
 
+// 디시인사이드 갤러리 링크 해석 결과 (backend /api/dcinside/resolve)
+interface DcinsideResolved {
+  galleryId: string;
+  galleryType: 'board' | 'mgallery' | 'mini';
+  galleryName: string;
+  link: string;
+  latestNo: number;
+}
+
+const DC_TYPE_LABELS: Record<string, string> = { board: '정식', mgallery: '마이너', mini: '미니' };
+// 키워드 최대 개수 (backend validateConfig와 동기)
+const DC_MAX_KEYWORDS = 20;
+
 // 알림 등록·수정. 단계마다 라우트가 분리된다:
 //   #/watch/new              종류 선택 (2뎁스 픽커)
 //   #/watch/new/<provider>   선택한 종류의 공통 등록 폼
@@ -262,6 +275,10 @@ export class WatchFormView extends LitElement {
   @state() private shopLink = '';
   @state() private shopInfo: ShopResolved | null = null;
   @state() private shopLoading = false;
+  // 디시인사이드 갤러리 링크 해석·키워드 입력 상태
+  @state() private dcLink = '';
+  @state() private dcLoading = false;
+  @state() private keywordInput = '';
   // CGV 목록 상태
   @state() private cgvMovies: CgvMovie[] | null = null;
   @state() private cgvTheaters: CgvTheater[] | null = null;
@@ -362,6 +379,7 @@ export class WatchFormView extends LitElement {
       return config.kind === 'index' ? `${config.name} 지수` : `${config.name} 주가`;
     }
     if (provider === 'emart' && typeof config.name === 'string') return config.name;
+    if (provider === 'dcinside' && typeof config.galleryName === 'string') return config.galleryName;
     if (provider === 'playstation' && config.mode === 'plusMonthly') return 'PS Plus 무료 게임';
     if (SHOP_PROVIDERS.includes(provider) && typeof config.name === 'string') return config.name;
     if (MOVIE_PROVIDERS.includes(provider) && typeof config.movieName === 'string') return config.movieName;
@@ -476,6 +494,62 @@ export class WatchFormView extends LitElement {
     this.config = { onPriceChange: this.config.onPriceChange };
   }
 
+  // 디시 갤러리 링크 해석 - 성공 시 갤러리 정보 확보 (키워드·옵션은 유지)
+  private async resolveDcinside(): Promise<void> {
+    if (this.dcLink.trim() === '' || this.dcLoading) return;
+    this.dcLoading = true;
+    try {
+      const info = await api<DcinsideResolved>('/api/dcinside/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ url: this.dcLink }),
+      });
+      this.applyConfig({
+        ...this.config,
+        galleryId: info.galleryId,
+        galleryType: info.galleryType,
+        galleryName: info.galleryName,
+        link: info.link,
+        latestNo: info.latestNo,
+      });
+    } catch (err) {
+      const message = err instanceof Error && !err.message.startsWith('api_error') ? err.message : '';
+      toast(message || '갤러리를 불러오지 못했어요');
+    } finally {
+      this.dcLoading = false;
+    }
+  }
+
+  // 갤러리 선택 초기화 (키워드·옵션은 유지)
+  private resetDcinside(): void {
+    this.dcLink = '';
+    this.config = { keywords: this.config.keywords, recommendOnly: this.config.recommendOnly };
+  }
+
+  // 키워드 추가 - 쉼표로 여러 개 한 번에, 중복(대소문자·공백 무시)은 건너뜀
+  private addKeyword(): void {
+    const current = (this.config.keywords ?? []) as string[];
+    const seen = new Set(current.map((k) => k.toLowerCase().replace(/\s+/g, '')));
+    const next = [...current];
+    for (const raw of this.keywordInput.split(',')) {
+      const word = raw.trim();
+      const key = word.toLowerCase().replace(/\s+/g, '');
+      if (word === '' || seen.has(key)) continue;
+      if (next.length >= DC_MAX_KEYWORDS) {
+        toast(`키워드는 ${DC_MAX_KEYWORDS}개까지 등록할 수 있어요`);
+        break;
+      }
+      seen.add(key);
+      next.push(word);
+    }
+    this.keywordInput = '';
+    this.applyConfig({ ...this.config, keywords: next });
+  }
+
+  private removeKeyword(word: string): void {
+    const current = (this.config.keywords ?? []) as string[];
+    this.applyConfig({ ...this.config, keywords: current.filter((k) => k !== word) });
+  }
+
   // 종목 검색 (250ms 디바운스)
   private onStockQuery(e: Event): void {
     this.stockQuery = (e.target as HTMLInputElement).value;
@@ -524,6 +598,17 @@ export class WatchFormView extends LitElement {
     ) {
       toast('스토어 링크를 불러와 주세요');
       return null;
+    }
+    if (this.providerId === 'dcinside') {
+      if (typeof this.config.galleryId !== 'string') {
+        toast('갤러리 링크를 불러와 주세요');
+        return null;
+      }
+      const keywords = this.config.keywords as string[] | undefined;
+      if (!Array.isArray(keywords) || keywords.length === 0) {
+        toast('키워드를 1개 이상 입력해 주세요');
+        return null;
+      }
     }
     if (MOVIE_PROVIDERS.includes(this.providerId)) {
       if (typeof this.config.movieNo !== 'string') {
@@ -647,6 +732,7 @@ export class WatchFormView extends LitElement {
     if (this.providerId === 'emart') return this.renderEmartConfig();
     if (SHOP_PROVIDERS.includes(this.providerId)) return this.renderShopConfig();
     if (MOVIE_PROVIDERS.includes(this.providerId)) return this.renderCgvConfig();
+    if (this.providerId === 'dcinside') return this.renderDcinsideConfig();
     return html`<p class="sub" style="margin:0">상세 설정은 준비 중이에요. 다음 업데이트에서 제공돼요.</p>`;
   }
 
@@ -1077,6 +1163,97 @@ export class WatchFormView extends LitElement {
       ${this.stockQuery.trim() !== '' && this.stockResults.length === 0
         ? html`<p class="sub" style="margin:10px 0 0">검색 결과가 없어요</p>`
         : nothing}
+    `;
+  }
+
+  // 디시인사이드 - 갤러리 링크 → 키워드(여러 개) → 개념글만 옵션
+  private renderDcinsideConfig(): TemplateResult {
+    if (typeof this.config.galleryId !== 'string') {
+      const validLink = /^https?:\/\/\S+/.test(this.dcLink.trim());
+      return html`
+        <div class="link-line">
+          <input
+            .value=${this.dcLink}
+            placeholder="갤러리 링크 붙여넣기"
+            style="background:var(--bg)"
+            @input=${(e: Event): void => { this.dcLink = (e.target as HTMLInputElement).value; }}
+            @keydown=${(e: KeyboardEvent): void => { if (e.key === 'Enter') void this.resolveDcinside(); }}
+          >
+          <button class="link-go" aria-label="갤러리 불러오기"
+            ?disabled=${!validLink || this.dcLoading}
+            @click=${(): void => void this.resolveDcinside()}>
+            ${icon('arrow-right', 19)}
+          </button>
+        </div>
+        <p class="sub" style="margin:8px 0 0">
+          gall.dcinside.com 갤러리 목록(또는 글) 주소를 넣어 주세요. 정식·마이너·미니 갤러리 모두 돼요.
+        </p>
+      `;
+    }
+
+    const keywords = (this.config.keywords ?? []) as string[];
+    const typeLabel = DC_TYPE_LABELS[String(this.config.galleryType)] ?? '';
+    return html`
+      <div class="stock-sel" style="margin-bottom:14px">
+        <span class="names">
+          <b>${this.config.galleryName}</b>
+          <span class="sub">${typeLabel ? `${typeLabel} 갤러리 · ` : ''}${this.config.galleryId}</span>
+        </span>
+        <button class="btn-ghost" @click=${(): void => this.resetDcinside()}>변경</button>
+      </div>
+
+      <div class="frow" style="min-height:auto;margin-bottom:8px">
+        <span style="font-weight:700;font-size:0.92rem">키워드</span>
+      </div>
+      ${keywords.length > 0
+        ? html`
+            <div class="store-chips">
+              ${keywords.map(
+                (k) => html`
+                  <span class="store-chip">
+                    ${k}
+                    <button aria-label="삭제" @click=${(): void => this.removeKeyword(k)}>${icon('x', 14)}</button>
+                  </span>
+                `,
+              )}
+            </div>
+          `
+        : nothing}
+      <div class="link-line">
+        <input
+          .value=${this.keywordInput}
+          placeholder="제목에 포함될 단어 (쉼표로 여러 개)"
+          style="background:var(--bg)"
+          @input=${(e: Event): void => { this.keywordInput = (e.target as HTMLInputElement).value; }}
+          @keydown=${(e: KeyboardEvent): void => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              this.addKeyword();
+            }
+          }}
+        >
+        <button class="link-go" aria-label="키워드 추가"
+          ?disabled=${this.keywordInput.trim() === ''}
+          @click=${(): void => this.addKeyword()}>
+          ${icon('plus', 19)}
+        </button>
+      </div>
+      <p class="sub" style="margin:8px 0 0">
+        제목에 키워드 중 하나라도 들어간 새 글을 알려드려요 (대소문자·띄어쓰기 무시).
+        알림을 만든 시점 이후에 올라온 글부터 알림이 와요.
+      </p>
+
+      <div class="frow" style="min-height:auto;margin-top:14px">
+        <span style="font-weight:700;font-size:0.92rem">개념글만</span>
+        <label class="switch">
+          <input type="checkbox" ?checked=${this.config.recommendOnly === true}
+            @change=${(e: Event): void => {
+              this.applyConfig({ ...this.config, recommendOnly: (e.target as HTMLInputElement).checked });
+            }}>
+          <span class="knob"></span>
+        </label>
+      </div>
+      <p class="sub" style="margin:6px 0 0">켜면 개념글 탭에 오른 글만 확인해요</p>
     `;
   }
 

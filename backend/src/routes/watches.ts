@@ -66,13 +66,16 @@ export async function watchRoutes(app: FastifyInstance): Promise<void> {
     const scheduleError = validateSchedule(schedule);
     if (scheduleError) return bad(reply, scheduleError);
     if (endsAt != null && !ENDS_RE.test(endsAt)) return bad(reply, '종료 시점이 올바르지 않습니다');
-    const configError = getCrawler(provider)?.validateConfig?.(config ?? {}, null);
+    const crawler = getCrawler(provider);
+    const configError = crawler?.validateConfig?.(config ?? {}, null);
     if (configError) return bad(reply, configError);
+    // 생성 시점 기준 상태 (예: 디시는 지금까지의 최신 글 번호 - 이후 글부터 알림)
+    const state = crawler?.initialState?.(config ?? {}, null) ?? null;
 
     const result = db
       .prepare(
-        `INSERT INTO watches (category, provider, name, schedule, config, ends_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO watches (category, provider, name, schedule, config, ends_at, state)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         category,
@@ -81,6 +84,7 @@ export async function watchRoutes(app: FastifyInstance): Promise<void> {
         JSON.stringify(schedule),
         JSON.stringify(config ?? {}),
         endsAt ?? null,
+        state ? JSON.stringify(state) : null,
       );
     return reply.code(201).send({ id: Number(result.lastInsertRowid) });
   });
@@ -101,14 +105,19 @@ export async function watchRoutes(app: FastifyInstance): Promise<void> {
       if (scheduleError) return bad(reply, scheduleError);
     }
     if (endsAt != null && !ENDS_RE.test(endsAt)) return bad(reply, '종료 시점이 올바르지 않습니다');
+    // 감시 대상이 바뀌면 크롤러가 state를 새로 잡는다 (null이면 유지)
+    let state: string | null = row.state;
     if (config !== undefined) {
-      const configError = getCrawler(row.provider)?.validateConfig?.(config, id);
+      const crawler = getCrawler(row.provider);
+      const configError = crawler?.validateConfig?.(config, id);
       if (configError) return bad(reply, configError);
+      const next = crawler?.initialState?.(config, JSON.parse(row.config) as Record<string, unknown>) ?? null;
+      if (next) state = JSON.stringify(next);
     }
 
     db.prepare(
       `UPDATE watches
-       SET name = ?, schedule = ?, config = ?, ends_at = ?, updated_at = datetime('now')
+       SET name = ?, schedule = ?, config = ?, ends_at = ?, state = ?, updated_at = datetime('now')
        WHERE id = ?`,
     ).run(
       name?.trim() ?? row.name,
@@ -116,6 +125,7 @@ export async function watchRoutes(app: FastifyInstance): Promise<void> {
       config !== undefined ? JSON.stringify(config) : row.config,
       // endsAt: undefined = 유지, null = 상시로 해제
       endsAt === undefined ? row.ends_at : endsAt,
+      state,
       id,
     );
     return { ok: true };

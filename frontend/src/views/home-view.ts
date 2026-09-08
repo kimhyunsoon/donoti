@@ -27,6 +27,17 @@ interface WatchRow {
 }
 
 // 이마트 감시 지점 요약: '구로점·성남점 외 2곳'
+// 디시 알림 목록에 표시할 키워드 요약 ('vue·react 외 3개')
+function dcKeywordLabel(config: string): string {
+  try {
+    const keywords = (JSON.parse(config) as { keywords?: string[] }).keywords ?? [];
+    const head = keywords.slice(0, 3).join('·');
+    return keywords.length > 3 ? `${head} 외 ${keywords.length - 3}개` : head;
+  } catch {
+    return '';
+  }
+}
+
 function emartStoreLabel(config: string): string {
   try {
     const stores = (JSON.parse(config) as { stores?: { name: string }[] }).stores ?? [];
@@ -246,7 +257,8 @@ export class HomeView extends LitElement {
       summary = '';
     }
     const on = w.enabled === 1;
-    const stores = w.provider === 'emart' ? emartStoreLabel(w.config) : '';
+    const stores =
+      w.provider === 'emart' ? emartStoreLabel(w.config) : w.provider === 'dcinside' ? dcKeywordLabel(w.config) : '';
     // 이마트: '재고 있을 때만'(기본)일 때만 표기, 매번 알림은 표기 없음
     let stockNote = '';
     if (w.provider === 'emart') {

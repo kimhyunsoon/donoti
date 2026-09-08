@@ -19,6 +19,7 @@ import { playstationRoutes } from './routes/playstation.js';
 import { cgvRoutes } from './routes/cgv.js';
 import { lotteRoutes } from './routes/lotte.js';
 import { megaboxRoutes } from './routes/megabox.js';
+import { dcinsideRoutes } from './routes/dcinside.js';
 
 // users 테이블이 비어있으면 env의 초기 계정 생성
 async function bootstrapInitialUser(): Promise<void> {
@@ -63,6 +64,7 @@ async function buildServer(): Promise<FastifyInstance> {
   await app.register(cgvRoutes, { prefix: '/api/cgv' });
   await app.register(lotteRoutes, { prefix: '/api/lotte' });
   await app.register(megaboxRoutes, { prefix: '/api/megabox' });
+  await app.register(dcinsideRoutes, { prefix: '/api/dcinside' });
 
   return app;
 }

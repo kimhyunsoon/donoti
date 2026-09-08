@@ -3,6 +3,7 @@ export const CATALOG: Readonly<Record<string, readonly string[]>> = {
   inventory: ['emart', 'nintendo', 'playstation'],
   movie: ['cgv', 'lotte', 'megabox'],
   price: ['fx', 'stock'],
+  community: ['dcinside'],
 };
 
 // 카테고리·제공자 조합이 카탈로그에 있는지
@@ -20,6 +21,7 @@ const PROVIDER_EMOJI: Record<string, string> = {
   megabox: '🎬',
   fx: '💱',
   stock: '📈',
+  dcinside: '💬',
 };
 
 // 영화·쇼핑은 어느 브랜드인지 제목에 표기 (시세는 이름만으로 충분)
@@ -30,6 +32,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   cgv: 'CGV',
   lotte: '롯데시네마',
   megabox: '메가박스',
+  dcinside: '디시인사이드',
 };
 
 // 합쳐진 브라우저 알림 제목용 (개별 제목에 브랜드를 안 쓰는 fx·stock도 이름이 필요)

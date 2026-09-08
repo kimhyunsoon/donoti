@@ -45,6 +45,11 @@ export const CATALOG: CategoryInfo[] = [
       { id: 'stock', label: '주식', icon: 'trending-up', color: '#e6455a' },
     ],
   },
+  {
+    id: 'community',
+    label: '게시글',
+    providers: [{ id: 'dcinside', label: '디시인사이드', image: '/brands/dcinside.jpg' }],
+  },
 ];
 
 // 환율 지원 통화 (backend/src/crawlers/fx.ts CURRENCIES와 동기 유지)

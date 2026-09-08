@@ -6,6 +6,7 @@ import { playstationCrawler } from './playstation.js';
 import { cgvCrawler } from './cgv.js';
 import { lotteCrawler } from './lotte.js';
 import { megaboxCrawler } from './megabox.js';
+import { dcinsideCrawler } from './dcinside.js';
 
 // 크롤러 레지스트리 - 각 provider는 서로 다른 프로그램처럼 개별 구현해 여기에 등록한다
 
@@ -45,6 +46,16 @@ export interface Crawler {
    * @returns 문제 없으면 null, 있으면 오류 메시지
    */
   validateConfig?: (config: Record<string, unknown>, excludeId: number | null) => string | null;
+  /**
+   * 등록·수정 시 watch.state 초기값. 생성 시점을 기준으로 삼아야 하는 크롤러(게시글 감시 등)가 쓴다
+   * @param config 저장될 config
+   * @param previous 수정이면 직전 config, 신규면 null
+   * @returns 새 state 객체, null이면 기존 state 유지
+   */
+  initialState?: (
+    config: Record<string, unknown>,
+    previous: Record<string, unknown> | null,
+  ) => Record<string, unknown> | null;
 }
 
 // provider → 크롤러 (전 카탈로그 구현 완료)
@@ -57,6 +68,7 @@ const registry: Record<string, Crawler> = {
   cgv: cgvCrawler,
   lotte: lotteCrawler,
   megabox: megaboxCrawler,
+  dcinside: dcinsideCrawler,
 };
 
 export function getCrawler(provider: string): Crawler | undefined {
