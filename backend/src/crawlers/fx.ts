@@ -72,7 +72,8 @@ export const fxCrawler: Crawler = {
         }
         for (const watch of group) clearCrawlFailure(watch);
         const ratioText = quote.ratio > 0 ? `+${quote.ratio}` : `${quote.ratio}`;
-        const body = `${quote.price}원\n전일 대비 ${ratioText}%`;
+        // 묶음 알림은 본문 첫 줄만 쓰므로 전일 대비를 같은 줄에 붙인다
+        const body = `${quote.price}원 (${ratioText}%)`;
         const url = detailUrl(info.reuters);
         for (const watch of group) {
           // 리다이렉트 URL 자동 설정 (사용자가 직접 넣지 않으므로 비어있을 때 채움)
