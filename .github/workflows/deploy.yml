@@ -19,11 +19,20 @@ jobs:
         with:
           node-version: 22
 
-      - name: backend 빌드 검증
+      - name: Rust 툴체인 (backend/rust-toolchain.toml)
+        working-directory: backend
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: backend 검사 (fmt · clippy · test)
         working-directory: backend
         run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --locked
 
       - name: frontend 빌드 검증
         working-directory: frontend

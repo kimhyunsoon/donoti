@@ -5,7 +5,7 @@
 ## 개발
 
 ```sh
-./dev.sh   # backend(:4646) + frontend(:4647) 동시 기동
+./dev.sh   # backend(Rust :4646) + frontend(:4647) 동시 기동 (Rust 툴체인 필요, backend 만은 backend/dev.sh)
            # → http://localhost:4647 접속
 ```
 

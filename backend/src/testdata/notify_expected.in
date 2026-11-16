@@ -1,0 +1,17 @@
+// TS 출력 그대로. 단 서로게이트 반쪽(\ud83d)은 Rust 문자열에 담을 수 없어 U+FFFD 로 바꿨다 (허용 차이)
+{
+assert_eq!(summary_line(&row(1, "cgv", "🎬 CGV · 오디세이 · 용산아이파크몰", "8/21 (금)\n17:05 IMAX관 · 12석")), "CGV · 오디세이 · 용산아이파크몰 · 8/21 (금)");
+assert_eq!(summary_line(&row(2, "cgv", "⚠️ 수집 실패 · 오디세이", "  CGV 상영표 조회 실패 (용산 20260821): cgv_blocked  \n복구되면 알림이 재개돼요")), "수집 실패 · 오디세이 · CGV 상영표 조회 실패 (용산 20260821): cgv_b…");
+assert_eq!(summary_line(&row(3, "manual", "👨‍👩‍👧 가족 알림", "")), "가족 알림");
+assert_eq!(summary_line(&row(4, "fx", "💱 달러 환율", "1,381.20원 (-0.98%)")), "달러 환율 · 1,381.20원 (-0.98%)");
+assert_eq!(summary_line(&row(5, "dcinside", "아주 긴 제목입니다 아주 긴 제목입니다 아주 긴 제목입니다 😀😀😀 끝", "갤러리 · 닉 · 12:30")), "아주 긴 제목입니다 아주 긴 제목입니다 아주 긴 제목입니다 😀😀😀 끝 · 갤러리 ·…");
+assert_eq!(summary_line(&row(6, "dcinside", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv😀x", "")), "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv\u{fffd}…");
+assert_eq!(summary_line(&row(7, "emart", "🛒 이마트 · 프로컨", "　구매 가능 · 89,800원　")), "이마트 · 프로컨 · 구매 가능 · 89,800원");
+assert_eq!(summary_line(&row(8, "stock", "📈  \t 삼성전자", "\n둘째 줄")), "삼성전자");
+assert_eq!(summary_line(&row(9, "x", "©️ 저작권 ™ 제목", "b")), "저작권 ™ 제목 · b");
+assert_eq!(summary_line(&row(10, "x", "1️⃣ 숫자 키캡", "b")), "1️⃣ 숫자 키캡 · b");
+let rs = vec![row(1, "cgv", "🎬 CGV · 오디세이 · 용산아이파크몰", "8/21 (금)\n17:05 IMAX관 · 12석"), row(2, "cgv", "⚠️ 수집 실패 · 오디세이", "  CGV 상영표 조회 실패 (용산 20260821): cgv_blocked  \n복구되면 알림이 재개돼요"), row(3, "manual", "👨‍👩‍👧 가족 알림", ""), row(4, "fx", "💱 달러 환율", "1,381.20원 (-0.98%)"), row(5, "dcinside", "아주 긴 제목입니다 아주 긴 제목입니다 아주 긴 제목입니다 😀😀😀 끝", "갤러리 · 닉 · 12:30"), row(6, "dcinside", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv😀x", ""), row(7, "emart", "🛒 이마트 · 프로컨", "　구매 가능 · 89,800원　"), row(8, "stock", "📈  \t 삼성전자", "\n둘째 줄"), row(9, "x", "©️ 저작권 ™ 제목", "b"), row(10, "x", "1️⃣ 숫자 키캡", "b")];
+assert_eq!(build_payload(&rs[..1], 3), "{\"id\":1,\"title\":\"🎬 CGV · 오디세이 · 용산아이파크몰\",\"body\":\"8/21 (금)\\n17:05 IMAX관 · 12석\",\"url\":\"/\",\"unread\":3}");
+assert_eq!(build_payload(&rs[..4], 7), "{\"ids\":[1,2,3,4],\"title\":\"🎬 CGV 알림 4건\",\"body\":\"CGV · 오디세이 · 용산아이파크몰 · 8/21 (금)\\n수집 실패 · 오디세이 · CGV 상영표 조회 실패 (용산 20260821): cgv_b…\\n가족 알림\\n달러 환율 · 1,381.20원 (-0.98%)\",\"url\":\"/\",\"unread\":7}");
+assert_eq!(build_payload(&rs[4..], 0), "{\"ids\":[5,6,7,8,9,10],\"title\":\"💬 디시인사이드 알림 6건\",\"body\":\"아주 긴 제목입니다 아주 긴 제목입니다 아주 긴 제목입니다 😀😀😀 끝 · 갤러리 ·…\\nabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv\u{fffd}…\\n이마트 · 프로컨 · 구매 가능 · 89,800원\\n삼성전자\\n저작권 ™ 제목 · b\\n1️⃣ 숫자 키캡 · b\",\"url\":\"/\",\"unread\":0}");
+}
