@@ -66,7 +66,7 @@ async fn me(req: Req) -> HResult {
         params![req.user_id()],
     )? {
         Some(u) => Ok(Reply::ok(Value::Object(u))),
-        None => Ok(Reply::empty(200)),
+        None => Ok(Reply::error(401, "unauthorized")),
     }
 }
 
