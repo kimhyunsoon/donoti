@@ -13,7 +13,7 @@
                                                    → 소진 시 failed (수동 재시도: POST /api/notifications/:id/retry)
 ```
 
-- 발송 지점은 backend 프로세스 내장 워커(`notify.rs`) 하나뿐. 생산자는 `enqueueNotification()`만 호출한다.
+- 발송 지점은 backend 프로세스 내장 워커(`notify.rs`) 하나뿐. 생산자는 `notify::enqueue()`만 호출한다.
 - 만료된 푸시 구독(404/410)은 발송 시 자동 정리된다.
 - 크롤러 주기는 `watches.schedule`(JSON), provider별 폼 데이터는 `watches.config`(JSON)에 저장한다. 크롤러 전용 런타임 상태는 `watches.state`. 새 크롤러는 `crawlers/<provider>.rs`에 run·validate_config 구현 후 `crawlers/mod.rs`의 `Crawler` 레지스트리에 등록 - 전체 구조는 architecture.md 참고.
 
