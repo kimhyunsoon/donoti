@@ -4,9 +4,30 @@ on:
   push:
     branches: [main]
 
+# 서버 웹훅을 부르기 전에 backend·frontend 를 병렬로 검증한다 - 하나라도 실패하면 배포 자체가 시작되지 않음
+# 어떤 서비스를 다시 빌드할지는 서버의 deploy/deploy.sh 가 변경 파일로 정한다
 jobs:
-  # 서버 웹훅을 부르기 전에 빌드를 검증한다 - 실패하면 배포 자체가 시작되지 않음
-  build:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust 툴체인 (backend/rust-toolchain.toml)
+        working-directory: backend
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: backend 검사 (fmt, clippy, test)
+        working-directory: backend
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --locked
+
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,31 +40,14 @@ jobs:
         with:
           node-version: 22
 
-      - name: Rust 툴체인 (backend/rust-toolchain.toml)
-        working-directory: backend
-        run: rustup toolchain install
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: backend
-
-      - name: backend 검사 (fmt · clippy · test)
-        working-directory: backend
-        run: |
-          cargo fmt --check
-          cargo clippy --all-targets --locked -- -D warnings
-          cargo test --locked
-
       - name: frontend 빌드 검증
         working-directory: frontend
         run: |
           pnpm install --frozen-lockfile
           pnpm build
 
-  # 항상 전체 재적용 - 변경 없는 이미지는 Docker 캐시로 수 초에 끝나고,
-  # 직전 배포가 실패했더라도 누락 없이 따라잡는다
   deploy:
-    needs: build
+    needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:
       - name: 서버 웹훅 호출
